@@ -175,3 +175,12 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 .vscode
+
+# Unsloth-PTO-VERIFY: ignore the try_datasets, try_models, try_outputs
+examples/datasets/
+examples/models/
+examples/outputs/
+examples/try_datasets/
+examples/try_outputs/
+examples/try_models/
+*.bak/
