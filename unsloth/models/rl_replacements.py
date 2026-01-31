@@ -202,14 +202,40 @@ def grpo_trainer__prepare_inputs(function_name, function):
     if function_name != "_prepare_inputs":
         return function
 
+    # Unsloth-PTO-VERIFY: check the native mixed precision training, cuda only
+    # # Add mixed precision training
+    # function = function.replace(
+    #     "with torch.inference_mode():",
+    #     "with torch.inference_mode(), "
+    #     "torch.amp.autocast(device_type = 'cuda', "
+    #     "dtype = ((torch.float16 if os.environ.get('ACCELERATE_MIXED_PRECISION', 'fp16') == 'fp16' else torch.bfloat16) "
+    #     "if not torch.is_autocast_enabled('cuda') else nullcontext())"
+    #     "if os.environ.get('UNSLOTH_FORCE_FLOAT32', '0') == '0' else torch.float16):",
+    # )
+
+
     # Add mixed precision training
+    # Use device-specific autocast for NPU, CUDA, etc.
+    # Unsloth-PTO-VERIFY: check the torch_npu autocast support
+    if DEVICE_TYPE == "npu":
+        # NPU uses npu-specific autocast context
+        autocast_code = (
+            "torch.npu.amp.autocast(enabled=True, "
+            "dtype = (torch.float16 if os.environ.get('ACCELERATE_MIXED_PRECISION', 'fp16') == 'fp16' else torch.bfloat16) "
+            "if os.environ.get('UNSLOTH_FORCE_FLOAT32', '0') == '0' else torch.float16)"
+        )
+    # Unsloth-PTO-VERIFY: check the native autocast_code or only with cuda?
+    else:
+        _device_type = DEVICE_TYPE_TORCH
+        autocast_code = (
+            f"torch.amp.autocast(device_type = '{_device_type}', "
+            f"dtype = ((torch.float16 if os.environ.get('ACCELERATE_MIXED_PRECISION', 'fp16') == 'fp16' else torch.bfloat16) "
+            f"if not torch.is_autocast_enabled('{_device_type}') else nullcontext())"
+            "if os.environ.get('UNSLOTH_FORCE_FLOAT32', '0') == '0' else torch.float16)"
+        )
     function = function.replace(
         "with torch.inference_mode():",
-        "with torch.inference_mode(), "
-        "torch.amp.autocast(device_type = 'cuda', "
-        "dtype = ((torch.float16 if os.environ.get('ACCELERATE_MIXED_PRECISION', 'fp16') == 'fp16' else torch.bfloat16) "
-        "if not torch.is_autocast_enabled('cuda') else nullcontext())"
-        "if os.environ.get('UNSLOTH_FORCE_FLOAT32', '0') == '0' else torch.float16):",
+        f"with torch.inference_mode(), {autocast_code}:",
     )
     function = function.replace(
         "self.accelerator.unwrap_model(self.model)",
@@ -721,9 +747,26 @@ def grpo_trainer__get_per_token_logps_and_entropies(function_name, function):
                     pixel_attention_mask_chunk,
                     image_sizes_chunk,
                 ) in zipped_inputs:
-                    with torch.amp.autocast(
-                        device_type = "cuda", dtype = self._autocast_dtype
-                    ):
+
+                    # Unsloth-PTO-VERIFY: check the native autocast_ctx on cuda
+                    # Native Implementations of autocast_ctx on cuda
+                    # with torch.amp.autocast(
+                    #     device_type = "cuda", dtype = self._autocast_dtype
+                    # ):
+                    # with _autocast_ctx:
+
+                    # Unsloth-PTO-VERIFY: check the implementations of NPU
+                    # Use correct device type for autocast (NPU, CUDA, etc.)
+                    # Detect device type at runtime since this function is injected into compiled trainer
+                    _device_type = self.model.device.type if hasattr(self.model, 'device') else 'cuda'
+                    if _device_type == "npu" or (hasattr(torch, 'npu') and torch.npu.is_available()):
+                        # NPU uses npu-specific autocast context
+                        _autocast_ctx = torch.npu.amp.autocast(enabled=True, dtype=self._autocast_dtype)
+                    else:
+                        _autocast_ctx = torch.amp.autocast(
+                            device_type = _device_type, dtype = self._autocast_dtype
+                        )
+                    with _autocast_ctx:
                         if pixel_values is None:
                             logits_chunk = unwrapped_model(
                                 input_ids = input_ids_chunk,
@@ -759,19 +802,70 @@ def grpo_trainer__get_per_token_logps_and_entropies(function_name, function):
                                 :, -logits_to_keep:
                             ]
 
-                        logprobs_chunk = chunked_hidden_states_selective_log_softmax(
-                            logits_chunk,
-                            lm_head,
-                            completion_input_ids_chunk,
-                            chunks = input_ids_chunk.shape[0] * multiplier,
-                            logit_scale_multiply = logit_scale_multiply,
-                            logit_scale_divide = logit_scale_divide,
-                            logit_softcapping = logit_softcapping,
-                            temperature = temperature,
-                        )
+                        # Unsloth-PTO-VERIFY: check the native chunked_hidden_states_selective_log_softmax on cuda
+                        # Native chunked_hidden_states_selective_log_softmax on cuda
+
+                        # logprobs_chunk = chunked_hidden_states_selective_log_softmax(
+                        #     logits_chunk,
+                        #     lm_head,
+                        #     completion_input_ids_chunk,
+                        #     chunks = input_ids_chunk.shape[0] * multiplier,
+                        #     logit_scale_multiply = logit_scale_multiply,
+                        #     logit_scale_divide = logit_scale_divide,
+                        #     logit_softcapping = logit_softcapping,
+                        #     temperature = temperature,
+                        # )
+
+                        # torch.npu.synchronize()
+
+
+
+
+                        # Unsloth-PTO-FIXME: check and fix this function and branch
+                        # Check if model returned hidden_states (shape [..., hidden_size])
+                        # or actual logits (shape [..., vocab_size])
+                        # hidden_size should match lm_head.shape[1], vocab_size should match lm_head.shape[0]
+                        hidden_size = lm_head.shape[1]
+                        last_dim = logits_chunk.shape[-1]
+                        
+                        if last_dim == hidden_size:
+                            # Model returned hidden_states, use chunked_hidden_states_selective_log_softmax
+                            logprobs_chunk = chunked_hidden_states_selective_log_softmax(
+                                logits_chunk,
+                                lm_head,
+                                completion_input_ids_chunk,
+                                chunks = input_ids_chunk.shape[0] * multiplier,
+                                logit_scale_multiply = logit_scale_multiply,
+                                logit_scale_divide = logit_scale_divide,
+                                logit_softcapping = logit_softcapping,
+                                temperature = temperature,
+                            )
+                        else:
+                            # Model returned actual logits, apply scaling and use selective_log_softmax
+                            if logit_scale_multiply != 0.0:
+                                logits_chunk = logits_chunk * logit_scale_multiply
+                            if logit_scale_divide != 0.0:
+                                logits_chunk = logits_chunk / logit_scale_divide
+                            if logit_softcapping != 0.0:
+                                logits_chunk = logits_chunk * torch.tanh(logits_chunk / logit_softcapping)
+                            if temperature != 1.0:
+                                logits_chunk = logits_chunk / temperature
+                            logprobs_chunk = selective_log_softmax(
+                                logits_chunk,
+                                completion_input_ids_chunk,
+                            )
+
+
+                    # Unsloth-PTO-VERIFY: check the device synthronize of cuda, npu and xpu
                     # This is needed to avoid race conditions with GPT OSS offload_embbed=True
                     # However, it seems that this line does not slow down or disrupt models.
-                    torch.cuda.synchronize()
+                    # Use device-agnostic synchronization (detect at runtime)
+                    if hasattr(torch, 'npu') and torch.npu.is_available():
+                        torch.npu.synchronize()
+                    elif hasattr(torch, 'xpu') and torch.xpu.is_available():
+                        torch.xpu.synchronize()
+                    elif hasattr(torch, 'cuda') and torch.cuda.is_available():
+                        torch.cuda.synchronize()
                     all_logprobs_list.append(logprobs_chunk)
                 logprobs = torch.cat(all_logprobs_list, dim = 0)
                 entropies = None

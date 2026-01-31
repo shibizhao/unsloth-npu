@@ -41,6 +41,8 @@ def get_device_type():
         return "cuda"
     elif hasattr(torch, "xpu") and torch.xpu.is_available():
         return "xpu"
+    elif hasattr(torch, "npu") and torch.npu.is_available(): # Unsloth-PTO-VERIFY: support torch_npu
+        return "npu"
     # Check torch.accelerator
     if hasattr(torch, "accelerator"):
         if not torch.accelerator.is_available():
@@ -72,11 +74,16 @@ def get_device_count():
         return torch.cuda.device_count()
     elif DEVICE_TYPE == "xpu":
         return torch.xpu.device_count()
+    elif DEVICE_TYPE == "npu": # Unsloth-PTO-VERIFY: support torch_npu
+        return torch.npu.device_count()
     else:
         return 1
 
 
 DEVICE_COUNT: int = get_device_count()
+
+
+# Unsloth-PTO-TODO: update the bitsandbytes implementations of NPU
 
 # 4-bit quantization requires a block size of 64
 # this is not supported on AMD Instinct GPUs currently

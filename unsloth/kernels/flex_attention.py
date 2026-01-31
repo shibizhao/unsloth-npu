@@ -17,6 +17,8 @@ from functools import lru_cache
 from transformers.models.llama.modeling_llama import logger
 import os
 
+# Unsloth-PTO-FIXME: update torch_compile support for npu
+
 torch_compile_options = {
     "epilogue_fusion": True,
     "max_autotune": True,

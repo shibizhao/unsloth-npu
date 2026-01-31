@@ -1091,17 +1091,31 @@ def _patch_trl_rl_trainers(trainer_file = "grpo_trainer"):
     )
 
     if RLTrainer_name == "GRPOTrainer":
-        new_options = """torch_compile_options = {
+        # Device-aware torch compile options
+        # Unsloth-PTO-VERIFY: check the cuda config with the native implementation
+        from ..device_type import DEVICE_TYPE
+        if DEVICE_TYPE == "cuda":
+            major, _ = torch.cuda.get_device_capability()
+            new_options = f"""torch_compile_options = {{
             "epilogue_fusion"   : True,
             "max_autotune"      : False,
             "shape_padding"     : True,
             "trace.enabled"     : False,
-            #"combo_kernels"     : torch.cuda.get_device_capability()[0] >= 10,
-            "triton.enable_persistent_tma_matmul": torch.cuda.get_device_capability()[0] >= 9,
-            "cuda.cutlass_epilogue_fusion_enabled": torch.cuda.get_device_capability()[0] >= 9, 
-            "cuda.cutlass_tma_only": torch.cuda.get_device_capability()[0] >= 9, 
+            #"combo_kernels"     : {major >= 10},
+            "triton.enable_persistent_tma_matmul": {major >= 9},
+            "cuda.cutlass_epilogue_fusion_enabled": {major >= 9}, 
+            "cuda.cutlass_tma_only": {major >= 9}, 
             "cuda.compile_opt_level"              : "-O2",
             "cuda.enable_cuda_lto"                : True,
+        }}"""
+        # Unsloth-PTO-FIXME: check the NPU/XPU/HIP config with torch_compile_options (torchair?)
+        else:
+            # For NPU/XPU/HIP - disable CUDA-specific options
+            new_options = """torch_compile_options = {
+            "epilogue_fusion"   : True,
+            "max_autotune"      : False,
+            "shape_padding"     : True,
+            "trace.enabled"     : False,
         }"""
 
         pattern = r"torch_compile_options\s*=\s*\{[^}]*\}"

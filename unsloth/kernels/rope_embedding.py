@@ -19,6 +19,7 @@ import torch
 from ..device_type import DEVICE_COUNT
 from .utils import calculate_settings, torch_gpu_device, torch_device_stream
 
+# Unsloth-PTO-FIXME: Update the triton kernels with triton-npu/PyPTO/PTO-ISA on Ascend NPU
 
 def _rope_embedding_QK(
     Q,

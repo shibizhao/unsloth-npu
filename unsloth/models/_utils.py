@@ -609,6 +609,13 @@ elif DEVICE_TYPE == "xpu":
     else:
         torch_amp_custom_fwd = torch.amp.custom_fwd(device_type = "xpu")
         torch_amp_custom_bwd = torch.amp.custom_bwd(device_type = "xpu")
+# Unsloth-PTO-VERIFY: check the torch_npu version range for unsloth
+elif DEVICE_TYPE == "npu":
+    if Version(torch_version) < Version("2.4.0"):
+        raise RuntimeError("torch.npu currently only supports torch.version >= 2.4.0")
+    else:
+        torch_amp_custom_fwd = torch.npu.amp.custom_fwd
+        torch_amp_custom_bwd = torch.npu.amp.custom_bwd
 # =============================================
 
 # =============================================
@@ -762,6 +769,10 @@ elif DEVICE_TYPE == "hip":
 
             HAS_FLASH_ATTENTION = False
 elif DEVICE_TYPE == "xpu":
+    SUPPORTS_BFLOAT16 = True
+
+# Unsloth-PTO-TODO: set these flags for NPU: SUPPORTS_BFLOAT16,HAS_FLASH_ATTENTION,HAS_FLASH_ATTENTION_SOFTCAPPING
+elif DEVICE_TYPE == "npu":
     SUPPORTS_BFLOAT16 = True
 
 # =============================================
@@ -1231,11 +1242,22 @@ def get_statistics(local_files_only = False):
         disabled = True
     _get_statistics(None)
     _get_statistics("repeat", force_download = False)
-    total_memory = (
-        torch.xpu.get_device_properties(0).total_memory
-        if DEVICE_TYPE == "xpu"
-        else torch.cuda.get_device_properties(0).total_memory
-    )
+
+    # Unsloth-PTO-VERIFY: check the native total_memory for xpu and cuda
+    # total_memory = (
+    #     torch.xpu.get_device_properties(0).total_memory
+    #     if DEVICE_TYPE == "xpu"
+    #     else torch.cuda.get_device_properties(0).total_memory
+    # )
+
+    # Unsloth-PTO-VERIFY: check the total_memory for npu
+    if DEVICE_TYPE == "npu":
+        total_memory = torch.npu.get_device_properties(0).total_memory
+    elif DEVICE_TYPE == "xpu":
+        total_memory = torch.xpu.get_device_properties(0).total_memory
+    else:
+        total_memory = torch.cuda.get_device_properties(0).total_memory
+
     vram = total_memory / 1024 / 1024 / 1024
     if vram <= 8:
         vram = 8

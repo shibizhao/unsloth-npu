@@ -122,6 +122,8 @@ if DEVICE_COUNT > 1:
         torch_gpu_device = torch.cuda.device
     elif DEVICE_TYPE == "xpu":
         torch_gpu_device = torch.xpu.device
+    elif DEVICE_TYPE == "npu":  # Unsloth-PTO-VERIFY: support torch_npu
+        torch_gpu_device = torch.npu.device
 else:
     from contextlib import nullcontext
 
@@ -132,6 +134,10 @@ else:
 # INTEL GPU Specific Logic
 if DEVICE_TYPE == "xpu":
     _gpu_getCurrentRawStream = torch._C._xpu_getCurrentRawStream
+# Ascend NPU Specific Logic
+elif DEVICE_TYPE == "npu":  # Unsloth-PTO-VERIFY: support torch_npu
+    import torch_npu
+    _gpu_getCurrentRawStream = torch_npu._C._npu_getCurrentRawStream
 # NVIDIA GPU Default Logic
 else:
     _gpu_getCurrentRawStream = torch._C._cuda_getCurrentRawStream
@@ -164,6 +170,21 @@ if DEVICE_TYPE == "xpu":
         XPU_STREAMS[k] = v
     XPU_STREAMS = tuple(XPU_STREAMS)
     del _XPU_STREAMS
+elif DEVICE_TYPE == "npu":  # Unsloth-PTO-VERIFY: support torch_npu
+    import torch_npu
+    _NPU_STREAMS = {
+        (index := torch.npu.device(i).idx): ctypes.c_void_p(
+            torch_npu._C._npu_getCurrentRawStream(index)
+        )
+        for i in range(DEVICE_COUNT)
+    }
+    NPU_STREAMS = [None] * (max(_NPU_STREAMS.keys()) + 1)
+    WEIGHT_BUFFERS = [None] * (max(_NPU_STREAMS.keys()) + 1)
+    ABSMAX_BUFFERS = [None] * (max(_NPU_STREAMS.keys()) + 1)
+    for k, v in _NPU_STREAMS.items():
+        NPU_STREAMS[k] = v
+    NPU_STREAMS = tuple(NPU_STREAMS)
+    del _NPU_STREAMS
 else:
     # NVIDIA GPU Default Logic
     _CUDA_STREAMS = {
@@ -196,10 +217,18 @@ else:
     cgemm_4bit_inference_naive_fp16 = bnb.functional.lib.cgemm_4bit_inference_naive_fp16
     cgemm_4bit_inference_naive_bf16 = bnb.functional.lib.cgemm_4bit_inference_naive_bf16
 
+# Unsloth-PTO-VERIFY: check the native device stream with xpu and cuda
+# torch_device_stream = (
+#     torch.xpu.current_stream if DEVICE_TYPE == "xpu" else torch.cuda.current_stream
+# )
 
-torch_device_stream = (
-    torch.xpu.current_stream if DEVICE_TYPE == "xpu" else torch.cuda.current_stream
-)
+# Unsloth-PTO-VERIFY: check the device stream API of npu
+if DEVICE_TYPE == "npu":
+    torch_device_stream = torch.npu.current_stream
+elif DEVICE_TYPE == "xpu":
+    torch_device_stream = torch.xpu.current_stream
+else:
+    torch_device_stream = torch.cuda.current_stream
 
 torch_mm = torch.mm
 torch_mv = torch.mv
@@ -567,6 +596,7 @@ elif DEVICE_TYPE in ("cuda", "hip") and HAS_CUDA_STREAM:
         return out.t() if is_transposed else out
 
     pass
+# Unsloth-PTO-FIXME: update NPU implmentations of fast inference
 else:
 
     @torch.inference_mode
@@ -854,6 +884,7 @@ elif DEVICE_TYPE in ("cuda", "hip") and HAS_CUDA_STREAM:
         return out
 
     pass
+# Unsloth-PTO-FIXME: update NPU implmentations of fast inference
 else:
 
     def fast_gemv(X, W, quant_state, out = None):

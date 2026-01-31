@@ -20,6 +20,7 @@ from .utils import (
     triton_tanh,
     torch_gpu_device,
 )
+# Unsloth-PTO-FIXME: Update the triton kernels with triton-npu/PyPTO/PTO-ISA on Ascend NPU
 
 # signed int32 max is 2**31-1 so num_elements cannot exceed 2**31
 NUM_INT32_ELEMENTS = 2**31

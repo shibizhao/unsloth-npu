@@ -122,6 +122,9 @@ BlockDiagonalCausalMask = (
 if DEVICE_TYPE == "xpu":
     clean_gpu_cache = torch.xpu.empty_cache
     get_current_device = torch.xpu.current_device
+elif DEVICE_TYPE == "npu": # Unsloth-PTO-VERIFY: support torch_npu
+    clean_gpu_cache = torch.npu.empty_cache
+    get_current_device = torch.npu.current_device
 else:
     clean_gpu_cache = torch.cuda.empty_cache
     get_current_device = torch.cuda.current_device
@@ -574,7 +577,9 @@ def fast_rms_layernorm_inference_gemma(self, X, out_weight = None):
 
 
 # Normal layernorm with mean removal
-@torch.compile(fullgraph = False, dynamic = True, options = torch_compile_options)
+# Unsloth-PTO-FIXME: Fix the torch.compile support for NPU
+# Currently, we commmented the torch.compile deracotor for the funning.
+# @torch.compile(fullgraph = False, dynamic = True, options = torch_compile_options)
 def fast_layernorm_compiled(layernorm, X):
     old_dtype = X.dtype
     X = X.float()
@@ -2175,6 +2180,10 @@ class FastLlamaModel:
                     fast_inference = False
             elif DEVICE_TYPE == "hip":
                 fast_inference = True
+            
+            # Unsloth-PTO-FIXME: Fix the vLLM-Ascend support for NPU: here or is_vLLM_available()
+            elif DEVICE_TYPE == "npu":
+                fast_inference = True
             if (
                 unsloth_vllm_standby
                 and os.environ.get("UNSLOTH_VLLM_STANDBY", "0") == "0"
@@ -2219,6 +2228,18 @@ class FastLlamaModel:
             gpu_stats_snippet = f"Intel Toolkit: {gpu_version}."
             try:
                 vllm_version = f" vLLM: {importlib_version('vllm')}."
+            except:
+                vllm_version = ""
+        # Unsloth-PTO-FIXME: Fix the vLLM-Ascend support for NPU: here or is_vLLM_available()
+        elif DEVICE_TYPE == "npu":
+            gpu_stats = torch.npu.get_device_properties(0)
+            gpu_stats_name = (
+                gpu_stats.name + ". " if gpu_stats.name != "" else "Ascend NPU Device. "
+            )
+            gpu_version = torch.version.cann
+            gpu_stats_snippet = f"Ascend NPU Toolkit: {gpu_version}."
+            try:
+                vllm_version = f" vLLM: {importlib_version('vllm')}." # Unsloth-PTO-FIXME: vLLM or vLLM-Ascend
             except:
                 vllm_version = ""
         else:

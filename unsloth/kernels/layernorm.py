@@ -21,6 +21,7 @@ from unsloth_zoo.patching_utils import (
     patch_layernorm,
 )
 
+# Unsloth-PTO-FIXME: Update the triton kernels with triton-npu/PyPTO/PTO-ISA on Ascend NPU
 
 @triton.jit
 def layernorm_forward(

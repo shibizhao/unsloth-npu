@@ -17,6 +17,7 @@ import triton.language as tl
 import torch
 from .utils import calculate_settings, torch_gpu_device
 
+# Unsloth-PTO-FIXME: Update the triton kernels with triton-npu/PyPTO/PTO-ISA on Ascend NPU
 
 @triton.jit
 def _rms_layernorm_forward(
@@ -239,6 +240,19 @@ def fast_rms_layernorm(layernorm, X: torch.Tensor, gemma: bool = False):
         if hasattr(layernorm, "variance_epsilon")
         else layernorm.eps
     )
+    # Unsloth-PTO-FIXME: check the support of fast_rms_layernorm on npu with triton-npu
+    # Use PyTorch native implementation on NPU (Triton not supported)
+    if hasattr(torch, 'npu') and torch.npu.is_available():
+        # Native PyTorch RMS LayerNorm implementation
+        dtype = X.dtype
+        X = X.float()
+        variance = X.pow(2).mean(-1, keepdim=True)
+        X = X * torch.rsqrt(variance + eps)
+        if gemma:
+            out = X * (1.0 + W.float())
+        else:
+            out = X * W.float()
+        return out.to(dtype)
     out = Fast_RMS_Layernorm.apply(X, W, eps, gemma)
     return out
 

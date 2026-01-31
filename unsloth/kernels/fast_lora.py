@@ -24,6 +24,7 @@ from .utils import (
     torch_amp_custom_bwd,
 )
 
+# Unsloth-PTO-FIXME: update torch_compile support for npu
 
 class LoRA_MLP(torch.autograd.Function):
     """

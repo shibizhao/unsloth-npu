@@ -22,6 +22,10 @@ from unsloth_zoo.utils import Version
 from unsloth_zoo.log import logger
 from unsloth_zoo.temporary_patches.common import torch_compile
 
+
+# Unsloth-PTO-FIXME: Disable the FP8 support for 910B/C.
+# Update the triton kernels with triton-npu/PyPTO/PTO-ISA on Ascend NPU
+
 torch_matmul = torch.matmul
 
 try:

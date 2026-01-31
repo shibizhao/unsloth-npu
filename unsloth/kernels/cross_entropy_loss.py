@@ -31,6 +31,8 @@ from unsloth_zoo.loss_utils import (
     post_patch_loss_function,
 )
 
+# Unsloth-PTO-FIXME: Update the triton kernels with triton-npu/PyPTO/PTO-ISA on Ascend NPU
+# Unsloth-PTO-FIXME: update torch_compile support for npu
 
 def _cross_entropy_forward(
     logits_ptr,
