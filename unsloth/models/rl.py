@@ -1406,6 +1406,15 @@ def _patch_trl_rl_trainers(trainer_file = "grpo_trainer"):
             cuda_options += """
             "cuda.compile_opt_level"              : "-O2",
             "cuda.enable_cuda_lto"                : True,
+        }}"""
+        # Unsloth-PTO-FIXME: check the NPU/XPU/HIP config with torch_compile_options (torchair?)
+        else:
+            # For NPU/XPU/HIP - disable CUDA-specific options
+            new_options = """torch_compile_options = {
+            "epilogue_fusion"   : True,
+            "max_autotune"      : False,
+            "shape_padding"     : True,
+            "trace.enabled"     : False,
         }"""
             new_options = base_options + cuda_options
         else:

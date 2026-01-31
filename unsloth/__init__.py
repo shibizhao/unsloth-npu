@@ -317,6 +317,12 @@ elif DEVICE_TYPE == "npu": # Unsloth-PTO-FIXME: update the bitsandbytes implemen
 
 
 
+elif DEVICE_TYPE == "npu": # Unsloth-PTO-FIXME: update the bitsandbytes implementations
+    import bitsandbytes as bnb
+
+    # TODO: check triton for intel installed properly.
+    pass    
+
 from .models import *
 from .models import __version__
 from .save import *

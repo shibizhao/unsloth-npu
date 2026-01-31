@@ -925,9 +925,28 @@ def grpo_trainer__get_per_token_logps_and_entropies(function_name, function):
                         _extra_vision_kwargs["mm_token_type_ids"] = (
                             mm_token_type_ids_chunk
                         )
-                    with torch.amp.autocast(
-                        device_type = "cuda", dtype = self._autocast_dtype
-                    ):
+
+                    # Unsloth-PTO-VERIFY: check the native autocast_ctx on cuda
+                    # Native Implementations of autocast_ctx on cuda
+                    # with torch.amp.autocast(
+                    #     device_type = "cuda", dtype = self._autocast_dtype
+                    # ):
+                    # with _autocast_ctx:
+
+                    # Unsloth-PTO-VERIFY: check the implementations of NPU
+                    # Use correct device type for autocast (NPU, CUDA, etc.)
+                    # Detect device type at runtime since this function is injected into compiled trainer
+                    _device_type = self.model.device.type if hasattr(self.model, 'device') else 'cuda'
+                    if _device_type == "npu" or (hasattr(torch, 'npu') and torch.npu.is_available()):
+                        # NPU uses npu-specific autocast context
+                        _autocast_ctx = torch.npu.amp.autocast(enabled=True, dtype=self._autocast_dtype)
+                    else:
+                        _autocast_ctx = torch.amp.autocast(
+                            device_type = _device_type, dtype = self._autocast_dtype
+                        )
+                    with _autocast_ctx:
+
+
                         if pixel_values is None:
                             logits_chunk = unwrapped_model(
                                 input_ids = input_ids_chunk,
@@ -976,29 +995,53 @@ def grpo_trainer__get_per_token_logps_and_entropies(function_name, function):
                             completion_input_ids_chunk = input_ids_chunk[
                                 :, -logits_to_keep:
                             ]
-                            # Guard: check if model returned hidden states or logits
-                            if logits_chunk.shape[-1] == lm_head.shape[1]:
-                                logprobs_chunk = (
-                                    chunked_hidden_states_selective_log_softmax(
-                                        logits_chunk,
-                                        lm_head,
-                                        completion_input_ids_chunk,
-                                        chunks = input_ids_chunk.shape[0] * multiplier,
-                                        logit_scale_multiply = logit_scale_multiply,
-                                        logit_scale_divide = logit_scale_divide,
-                                        logit_softcapping = logit_softcapping,
-                                        temperature = temperature,
-                                    )
-                                )
-                            else:
-                                # Model returned logits directly - scaling/softcapping already applied by model forward
-                                logprobs_chunk = chunked_selective_log_softmax(
-                                    logits_chunk,
-                                    completion_input_ids_chunk,
-                                    temperature,
-                                )
+
+                        # Unsloth-PTO-VERIFY: check the native chunked_hidden_states_selective_log_softmax on cuda
+                        # Native chunked_hidden_states_selective_log_softmax on cuda
+
+                        # logprobs_chunk = chunked_hidden_states_selective_log_softmax(
+                        #     logits_chunk,
+                        #     lm_head,
+                        #     completion_input_ids_chunk,
+                        #     chunks = input_ids_chunk.shape[0] * multiplier,
+                        #     logit_scale_multiply = logit_scale_multiply,
+                        #     logit_scale_divide = logit_scale_divide,
+                        #     logit_softcapping = logit_softcapping,
+                        #     temperature = temperature,
+                        # )
+
+
+                        # Unsloth-PTO-FIXME: check and fix this function and branch
+                        # Check if model returned hidden_states (shape [..., hidden_size])
+                        # or actual logits (shape [..., vocab_size])
+                        # hidden_size should match lm_head.shape[1], vocab_size should match lm_head.shape[0]
+                        hidden_size = lm_head.shape[1]
+                        last_dim = logits_chunk.shape[-1]
+                        
+                        if last_dim == hidden_size:
+                            # Model returned hidden_states, use chunked_hidden_states_selective_log_softmax
+                            logprobs_chunk = chunked_hidden_states_selective_log_softmax(
+                                logits_chunk,
+                                lm_head,
+                                completion_input_ids_chunk,
+                                chunks = input_ids_chunk.shape[0] * multiplier,
+                                logit_scale_multiply = logit_scale_multiply,
+                                logit_scale_divide = logit_scale_divide,
+                                logit_softcapping = logit_softcapping,
+                                temperature = temperature,
+                            )
+                        else:
+                            logprobs_chunk = selective_log_softmax(
+                                logits_chunk,
+                                completion_input_ids_chunk,
+                                temperature,
+                            )
+
+
+                    # Unsloth-PTO-VERIFY: check the device synthronize of cuda, npu and xpu
                     # This is needed to avoid race conditions with GPT OSS offload_embbed=True
                     # However, it seems that this line does not slow down or disrupt models.
+                    # Use device-agnostic synchronization (detect at runtime)
                     device_synchronize()
                     all_logprobs_list.append(logprobs_chunk)
                 logprobs = torch.cat(all_logprobs_list, dim = 0)
