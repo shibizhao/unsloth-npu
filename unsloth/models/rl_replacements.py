@@ -29,6 +29,7 @@ from unsloth_zoo.rl_replacements import RL_REPLACEMENTS, left_pack_padding
 from unsloth_zoo.utils import Version
 from importlib.metadata import version as importlib_version
 from unsloth_zoo.log import logger
+from unsloth_zoo.device_type import device_synchronize
 import importlib.util
 from ..device_type import (
     is_hip,
@@ -869,13 +870,7 @@ def grpo_trainer__get_per_token_logps_and_entropies(function_name, function):
                     # Unsloth-PTO-VERIFY: check the device synthronize of cuda, npu and xpu
                     # This is needed to avoid race conditions with GPT OSS offload_embbed=True
                     # However, it seems that this line does not slow down or disrupt models.
-                    # Use device-agnostic synchronization (detect at runtime)
-                    if hasattr(torch, 'npu') and torch.npu.is_available():
-                        torch.npu.synchronize()
-                    elif hasattr(torch, 'xpu') and torch.xpu.is_available():
-                        torch.xpu.synchronize()
-                    elif hasattr(torch, 'cuda') and torch.cuda.is_available():
-                        torch.cuda.synchronize()
+                    device_synchronize()
                     all_logprobs_list.append(logprobs_chunk)
                 logprobs = torch.cat(all_logprobs_list, dim = 0)
                 entropies = None
