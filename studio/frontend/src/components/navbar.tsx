@@ -16,7 +16,7 @@ import {
   Analytics01Icon,
   ArrowRight01Icon,
   Book03Icon,
-  CursorInfo02Icon,
+  CookBookIcon,
   PackageIcon,
   ZapIcon,
 } from "@hugeicons/core-free-icons";
@@ -29,6 +29,7 @@ import { TOUR_OPEN_EVENT } from "@/features/tour";
 
 const NAV_ITEMS = [
   { label: "Studio", href: "/studio", icon: ZapIcon, enabled: true },
+  { label: "Recipes", href: "/data-recipes", icon: CookBookIcon, enabled: true },
   { label: "Evaluate", href: "/evaluate", icon: Analytics01Icon, enabled: false },
   { label: "Export", href: "/export", icon: PackageIcon, enabled: true },
   { label: "Chat", href: "/chat", icon: AiChat02Icon, enabled: true },
@@ -96,10 +97,16 @@ export function Navbar() {
           className="hidden items-center rounded-full border border-border bg-card p-1 ring-1 ring-foreground/5 md:flex"
         >
           {NAV_ITEMS.map((item) => {
+<<<<<<< HEAD
             const active = pathname === item.href;
             const disabledByTraining =
               isTrainingRunning && item.href !== "/studio";
             if (!item.enabled || disabledByTraining) {
+=======
+            const active =
+              pathname === item.href || pathname.startsWith(`${item.href}/`);
+            if (!item.enabled) {
+>>>>>>> 30cc5091 (feat: implement Data Recipes page feature subfolders for workflow management and saving logic)
               return (
                 <span
                   key={item.href}
