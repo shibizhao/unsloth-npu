@@ -7,12 +7,11 @@ import {
   useTrainingRuntimeLifecycle,
   useTrainingRuntimeStore,
 } from "@/features/training";
-import { GuidedTour } from "@/features/tour";
-import { studioTourSteps } from "@/features/studio/tour";
+import { GuidedTour, useGuidedTourController } from "@/features/tour";
+import { studioTourSteps, studioTrainingTourSteps } from "@/features/studio/tour";
 import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { type ReactElement, useEffect, useState } from "react";
-import { DatasetPreviewDialog } from "./sections/dataset-preview-dialog";
+import { type ReactElement, useEffect } from "react";
 import { DatasetSection } from "./sections/dataset-section";
 import { ModelSection } from "./sections/model-section";
 import { ParamsSection } from "./sections/params-section";
@@ -36,25 +35,25 @@ export function StudioPage(): ReactElement {
   const closeDialog = useDatasetPreviewDialogStore((s) => s.close);
 
   const canGoBack = runtimePhase === "stopped" || runtimePhase === "error";
-  const tourEnabled = hasHydratedRuntime && !isHydratingRuntime && !showTrainingView;
-  const [tourOpen, setTourOpen] = useState(false);
+  const tourEnabled = hasHydratedRuntime && !isHydratingRuntime;
+  const isConfigTour = !showTrainingView;
+  const tourSteps = showTrainingView ? studioTrainingTourSteps : studioTourSteps;
+  const tour = useGuidedTourController({
+    id: "studio",
+    steps: tourSteps,
+    enabled: tourEnabled,
+    autoKey: isConfigTour ? STUDIO_TOUR_KEY : undefined,
+    autoWhen: isConfigTour,
+  });
 
   useEffect(() => {
-    if (!tourEnabled) return;
-    if (localStorage.getItem(STUDIO_TOUR_KEY)) return;
-    setTourOpen(true);
-  }, [tourEnabled]);
+    tour.setOpen(false);
+  }, [showTrainingView, tour.setOpen]);
 
   return (
     <div className="min-h-screen bg-background">
       <main className="mx-auto max-w-7xl px-6 py-4">
-        <GuidedTour
-          open={tourOpen}
-          onOpenChange={setTourOpen}
-          steps={studioTourSteps}
-          onSkip={() => localStorage.setItem(STUDIO_TOUR_KEY, "skipped")}
-          onComplete={() => localStorage.setItem(STUDIO_TOUR_KEY, "done")}
-        />
+        <GuidedTour {...tour.tourProps} />
 
         <DatasetPreviewDialog
           open={dialogOpen}
