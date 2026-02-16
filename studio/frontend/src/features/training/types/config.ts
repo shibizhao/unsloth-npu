@@ -51,6 +51,8 @@ export interface TrainingConfigState {
   enableTensorboard: boolean;
   tensorboardDir: string;
   logFrequency: number;
+  isCheckingVision: boolean;
+  isVisionModel: boolean;
   finetuneVisionLayers: boolean;
   finetuneLanguageLayers: boolean;
   finetuneAttentionModules: boolean;

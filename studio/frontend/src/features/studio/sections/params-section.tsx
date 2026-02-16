@@ -109,7 +109,7 @@ function SliderRow({
 export function ParamsSection(): ReactElement {
   const store = useTrainingConfigStore();
   const isLora = store.trainingMethod !== "full";
-  const isVision = store.modelType === "vision";
+  const isVision = store.isVisionModel;
   const [loraOpen, setLoraOpen] = useState(false);
   const [hyperOpen, setHyperOpen] = useState(false);
 
@@ -707,7 +707,7 @@ export function ParamsSection(): ReactElement {
                     </SelectContent>
                   </Select>
                 </Row>
-                {store.modelType !== "vision" && (
+                {!store.isVisionModel && (
                   <div className="flex items-center gap-2">
                     <Checkbox
                       id="packing"
