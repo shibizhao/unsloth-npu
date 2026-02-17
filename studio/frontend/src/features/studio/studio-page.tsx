@@ -70,7 +70,7 @@ export function StudioPage(): ReactElement {
         length="62vh"
         style={{ opacity: 0.45 }}
       />
-      <main className="relative z-10 mx-auto max-w-7xl px-6 py-4">
+      <main className="relative z-10 mx-auto max-w-7xl px-4 py-4 sm:px-6">
         <GuidedTour {...tour.tourProps} celebrate={isConfigTour} />
 
         <DatasetPreviewDialog
@@ -101,8 +101,7 @@ export function StudioPage(): ReactElement {
           </Button>
         )}
 
-        {/* Header */}
-        <div className="mb-8 flex flex-col gap-0.5">
+        <div className="mb-6 flex flex-col gap-0.5 sm:mb-8">
           <h1 className="text-2xl font-semibold tracking-tight">
             Fine-tuning Studio
           </h1>
@@ -120,7 +119,7 @@ export function StudioPage(): ReactElement {
         ) : showTrainingView ? (
           <TrainingView />
         ) : (
-          <div className="grid grid-cols-12 items-start gap-6">
+          <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-12">
             <ModelSection />
             <DatasetSection />
             <ParamsSection />
