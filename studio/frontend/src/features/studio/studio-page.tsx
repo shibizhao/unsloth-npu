@@ -8,7 +8,7 @@ import {
   useTrainingRuntimeStore,
 } from "@/features/training";
 import { GuidedTour, useGuidedTourController } from "@/features/tour";
-import { studioTourSteps, studioTrainingTourSteps } from "@/features/studio/tour";
+import { studioTourSteps, studioTrainingTourSteps } from "./tour";
 import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type ReactElement, useEffect } from "react";
@@ -29,6 +29,10 @@ export function StudioPage(): ReactElement {
   const hasHydratedRuntime = useTrainingRuntimeStore((state) => state.hasHydrated);
   const { dismissTrainingRun } = useTrainingActions();
   const config = useTrainingConfigStore();
+  const selectedModel = useTrainingConfigStore((s) => s.selectedModel);
+  const ensureModelDefaultsLoaded = useTrainingConfigStore(
+    (s) => s.ensureModelDefaultsLoaded,
+  );
   const dialogOpen = useDatasetPreviewDialogStore((s) => s.open);
   const dialogMode = useDatasetPreviewDialogStore((s) => s.mode);
   const dialogInitial = useDatasetPreviewDialogStore((s) => s.initialData);
@@ -46,9 +50,14 @@ export function StudioPage(): ReactElement {
     autoWhen: isConfigTour,
   });
 
+  const setTourOpen = tour.setOpen;
   useEffect(() => {
-    tour.setOpen(false);
-  }, [showTrainingView, tour.setOpen]);
+    setTourOpen(false);
+  }, [showTrainingView, setTourOpen]);
+
+  useEffect(() => {
+    ensureModelDefaultsLoaded();
+  }, [selectedModel, ensureModelDefaultsLoaded]);
 
   return (
     <div className="min-h-screen bg-background">
