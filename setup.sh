@@ -149,25 +149,16 @@ fi
 BEST_VER=$("$BEST_PY" --version 2>&1 | awk '{print $2}')
 echo "✅ Using $BEST_PY ($BEST_VER) — compatible (≤ 3.12.x)"
 
-if [ "$IS_COLAB" = true ]; then
-    # Colab: install packages directly without venv
-    run_quiet "pip upgrade" pip install --upgrade pip
-    echo "   Installing unsloth-zoo + unsloth..."
-    run_quiet "pip install unsloth" pip install unsloth-zoo unsloth
-    echo "   Installing studio dependencies..."
-    run_quiet "pip install extras" pip install typer fastapi uvicorn pydantic matplotlib pandas nest_asyncio "datasets==4.3.0" pyjwt easydict addict
-    echo "✅ Python dependencies installed"
-else
-    # Local: create venv
-    "$BEST_PY" -m venv .venv
-    source .venv/bin/activate
-    run_quiet "pip upgrade" pip install --upgrade pip
-    echo "   Installing unsloth-zoo + unsloth..."
-    run_quiet "pip install unsloth" pip install unsloth-zoo unsloth
-    echo "   Installing studio dependencies..."
-    run_quiet "pip install extras" pip install typer fastapi uvicorn pydantic matplotlib pandas nest_asyncio "datasets==4.3.0" pyjwt easydict addict
-    echo "✅ Python dependencies installed"
-fi
+"$BEST_PY" -m venv .venv
+source .venv/bin/activate
+run_quiet "pip upgrade" pip install --upgrade pip
+echo "   Installing unsloth-zoo + unsloth..."
+run_quiet "pip install unsloth" pip install unsloth-zoo unsloth
+echo "   Installing llama-cpp deps..."
+run_quiet "pip install llama-cpp deps" pip install gguf==0.17.1 protobuf==6.33.5 sentencepiece==0.2.1 mistral_common==1.9.0
+echo "   Installing studio dependencies..."
+run_quiet "pip install extras" pip install typer fastapi uvicorn pydantic matplotlib pandas nest_asyncio "datasets==4.3.0" pyjwt easydict addict
+echo "✅ Python dependencies installed"
 
 # ── 7. Add shell alias (skip in Colab) ──
 # Note: venv activation does NOT persist across terminal sessions.
