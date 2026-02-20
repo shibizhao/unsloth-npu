@@ -97,16 +97,12 @@ export function Navbar() {
           className="hidden items-center rounded-full border border-border bg-card p-1 ring-1 ring-foreground/5 md:flex"
         >
           {NAV_ITEMS.map((item) => {
-<<<<<<< HEAD
-            const active = pathname === item.href;
             const disabledByTraining =
               isTrainingRunning && item.href !== "/studio";
             if (!item.enabled || disabledByTraining) {
-=======
             const active =
               pathname === item.href || pathname.startsWith(`${item.href}/`);
             if (!item.enabled) {
->>>>>>> 30cc5091 (feat: implement Data Recipes page feature subfolders for workflow management and saving logic)
               return (
                 <span
                   key={item.href}
