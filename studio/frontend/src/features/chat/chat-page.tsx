@@ -5,7 +5,6 @@ import {
 } from "@/components/assistant-ui/model-selector";
 import { Thread } from "@/components/assistant-ui/thread";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
 import { SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import {
   Sheet,
@@ -284,8 +283,7 @@ export function ChatPage(): ReactElement {
   const modelsFromStore = useChatRuntimeStore((state) => state.models);
   const lorasFromStore = useChatRuntimeStore((state) => state.loras);
   const modelsError = useChatRuntimeStore((state) => state.modelsError);
-  const { refresh, selectModel, ejectModel, loadingModel } =
-    useChatModelRuntime();
+  const { refresh, selectModel, ejectModel } = useChatModelRuntime();
   const refreshRef = useRef(refresh);
   const selectModelRef = useRef(selectModel);
 
@@ -542,39 +540,32 @@ export function ChatPage(): ReactElement {
           />
         </InlineSidebar>
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <div className="flex h-11 shrink-0 items-center px-1.5 sm:px-2">
-            <div className="flex items-center gap-1">
-              <SidebarTrigger />
-              <TopBarActions
-                onNewThread={handleNewThread}
-                onNewCompare={handleNewCompare}
-                showCompare={canCompare}
-              />
-              <ModelSelector
-                models={models}
-                loraModels={loraModels}
-                value={inferenceParams.checkpoint}
-                onValueChange={handleCheckpointChange}
-                onEject={handleEject}
-                variant="ghost"
-                open={modelSelectorOpen}
-                onOpenChange={handleModelSelectorOpenChange}
-                triggerDataTour="chat-model-selector"
-                contentDataTour="chat-model-selector-popover"
-                className="max-w-[62vw] sm:max-w-none"
-              />
-              {loadingModel ? (
-                <div
-                  className="flex items-center gap-1.5 text-muted-foreground"
-                  title={`Loading ${loadingModel.displayName}. This may include downloading.`}
-                >
-                  <Spinner className="size-3.5 shrink-0" />
-                  <span className="text-xs">
-                    Downloading model…
-                  </span>
-                </div>
-              ) : null}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="flex h-11 shrink-0 items-center px-1.5 sm:px-2">
+          <div className="flex items-center gap-1">
+            <SidebarTrigger />
+            <TopBarActions
+              onNewThread={handleNewThread}
+              onNewCompare={handleNewCompare}
+              showCompare={canCompare}
+            />
+            <ModelSelector
+              models={models}
+              loraModels={loraModels}
+              value={inferenceParams.checkpoint}
+              onValueChange={handleCheckpointChange}
+              onEject={handleEject}
+              variant="ghost"
+              open={modelSelectorOpen}
+              onOpenChange={handleModelSelectorOpenChange}
+              triggerDataTour="chat-model-selector"
+              contentDataTour="chat-model-selector-popover"
+              className="max-w-[62vw] sm:max-w-none"
+            />
+          </div>
+          {modelsError && (
+            <div className="ml-2 text-xs text-destructive truncate max-w-[28rem]">
+              {modelsError}
             </div>
             {modelsError && (
               <div className="ml-2 text-xs text-destructive truncate max-w-[28rem]">
