@@ -113,7 +113,9 @@ class TrainingBackend:
                        # Optional parameters
                        custom_format_mapping: dict = None,
                        subset: str = None,
-                       split: str = "train",
+                       train_split: str = "train",
+                       eval_split: str = None,
+                       eval_steps: float = 0.00,
                        is_dataset_multimodal: bool = False) -> bool:
         """
         Start training.
