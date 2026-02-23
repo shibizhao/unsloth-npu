@@ -46,13 +46,8 @@ firebase-debug.log
 # Other
 resources/
 tmp/
-
-# Local working docs
-**/CLAUDE.md
-**/claude.md
-**/AGENT.md
-**/agent.md
-docs/canvas-lab-architecture.md
-studio/frontend/test/
-studio/tests/
-studio/backend/tests/
+auth.db
+studio/frontend/package-lock.json
+log_rtx.txt
+log.txt
+setup_leo.sh
