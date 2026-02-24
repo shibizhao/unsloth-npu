@@ -333,7 +333,7 @@ export function ChatPage(): ReactElement {
   }, [inferenceParams.checkpoint, lorasFromStore]);
 
   const handleCheckpointChange = useCallback(
-    (value: string, meta?: { isLora: boolean }) => {
+    (value: string, meta?: { isLora: boolean; ggufVariant?: string }) => {
       const currentCheckpoint =
         useChatRuntimeStore.getState().params.checkpoint;
       if (!value || value === currentCheckpoint) return;
@@ -358,17 +358,10 @@ export function ChatPage(): ReactElement {
                 : "Full chat history will be sent to the new model.";
           }
         }
-
-        if (switchNote) {
-          toast.warning("Model changed for this chat", {
-            description: switchNote,
-            duration: 6000,
-          });
-        }
-
         await selectModel({
           id: value,
           isLora: meta?.isLora,
+          ggufVariant: meta?.ggufVariant,
         });
       })();
     },

@@ -20,7 +20,11 @@ const DEFAULT_MODEL_MAX_SEQ_LENGTH = 2048;
 type SelectedModelInput = {
   id: string;
   isLora?: boolean;
+<<<<<<< HEAD
   loadingDescription?: string;
+=======
+  ggufVariant?: string;
+>>>>>>> ef1cd3ac (Use llama-server -hf mode, add GGUF variant selector, fix vision detection)
 };
 
 const LORA_SUFFIX_RE = /_(\d{9,})$/;
@@ -159,8 +163,8 @@ export function useChatModelRuntime() {
 
       const explicitIsLora =
         typeof selection === "string" ? undefined : selection.isLora;
-      const extraLoadingDescription =
-        typeof selection === "string" ? undefined : selection.loadingDescription;
+      const ggufVariant =
+        typeof selection === "string" ? undefined : selection.ggufVariant;
       const model = models.find((entry) => entry.id === modelId);
       const lora = loras.find((entry) => entry.id === modelId);
       const isLora =
@@ -191,6 +195,7 @@ export function useChatModelRuntime() {
             max_seq_length: DEFAULT_MODEL_MAX_SEQ_LENGTH,
             load_in_4bit: true,
             is_lora: isLora,
+            gguf_variant: ggufVariant ?? null,
           });
 
           const currentParams = useChatRuntimeStore.getState().params;

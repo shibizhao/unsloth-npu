@@ -1,10 +1,27 @@
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+<<<<<<< HEAD
 import { useDebouncedValue, useHfModelSearch, useInfiniteScroll } from "@/hooks";
+=======
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { listGgufVariants } from "@/features/chat/api/chat-api";
+import type { GgufVariantDetail } from "@/features/chat/types/api";
+import {
+  useDebouncedValue,
+  useGpuInfo,
+  useHfModelSearch,
+  useInfiniteScroll,
+  useRecommendedModelVram,
+} from "@/hooks";
+>>>>>>> ef1cd3ac (Use llama-server -hf mode, add GGUF variant selector, fix vision detection)
 import { cn, formatCompact } from "@/lib/utils";
 import { Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type {
   LoraModelOption,
   ModelOption,
@@ -21,6 +38,15 @@ function ListLabel({ children }: { children: ReactNode }) {
       {children}
     </div>
   );
+}
+
+/** Format bytes to a human-readable size string. */
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  const value = bytes / 1024 ** i;
+  return `${value.toFixed(value < 10 ? 1 : 0)} ${units[i]}`;
 }
 
 function ModelRow({
@@ -69,6 +95,124 @@ function ModelRow({
   );
 }
 
+// ── GGUF Variant Expander ────────────────────────────────────
+
+function GgufVariantExpander({
+  repoId,
+  onSelect,
+}: {
+  repoId: string;
+  onSelect: (id: string, meta: ModelSelectorChangeMeta) => void;
+}) {
+  const [variants, setVariants] = useState<GgufVariantDetail[] | null>(null);
+  const [defaultVariant, setDefaultVariant] = useState<string | null>(null);
+  const [hasVision, setHasVision] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let canceled = false;
+    setLoading(true);
+    setError(null);
+
+    listGgufVariants(repoId)
+      .then((res) => {
+        if (canceled) return;
+        setVariants(res.variants);
+        setDefaultVariant(res.default_variant);
+        setHasVision(res.has_vision);
+      })
+      .catch((err) => {
+        if (canceled) return;
+        setError(err instanceof Error ? err.message : "Failed to load variants");
+      })
+      .finally(() => {
+        if (!canceled) setLoading(false);
+      });
+
+    return () => {
+      canceled = true;
+    };
+  }, [repoId]);
+
+  const handleVariantClick = useCallback(
+    (quant: string) => {
+      onSelect(repoId, {
+        source: "hub",
+        isLora: false,
+        ggufVariant: quant,
+      });
+    },
+    [repoId, onSelect],
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 px-5 py-2">
+        <Spinner className="size-3 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground">Loading variants…</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="px-5 py-2 text-xs text-destructive">{error}</div>
+    );
+  }
+
+  if (!variants || variants.length === 0) {
+    return (
+      <div className="px-5 py-2 text-xs text-muted-foreground">
+        No GGUF variants found.
+      </div>
+    );
+  }
+
+  return (
+    <div className="pl-4 border-l-2 border-accent/50 ml-3 my-1">
+      <div className="px-2 py-1 flex items-center gap-1.5">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Quantizations
+        </span>
+        {hasVision && (
+          <span className="text-[9px] font-medium text-blue-400">Vision</span>
+        )}
+      </div>
+      {variants.map((v) => (
+        <button
+          key={v.filename}
+          type="button"
+          onClick={() => handleVariantClick(v.quant)}
+          className={cn(
+            "flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1 text-left text-sm transition-colors hover:bg-accent",
+          )}
+        >
+          <span className="min-w-0 flex-1 truncate font-mono text-xs">
+            {v.quant}
+            {v.quant === defaultVariant && (
+              <span className="ml-1.5 text-[9px] font-sans font-medium text-primary/70">
+                recommended
+              </span>
+            )}
+          </span>
+          <span className="text-[10px] text-muted-foreground shrink-0">
+            {formatBytes(v.size_bytes)}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── Detect GGUF repos by naming convention ────────────────────
+
+function isGgufRepo(id: string): boolean {
+  return id.toUpperCase().includes("-GGUF");
+}
+
+// ── Hub Model Picker ──────────────────────────────────────────
+
 export function HubModelPicker({
   models,
   value,
@@ -83,6 +227,9 @@ export function HubModelPicker({
   const { results, isLoading, isLoadingMore, fetchMore } = useHfModelSearch(
     debouncedQuery,
   );
+
+  // Track which GGUF repo is expanded for variant selection
+  const [expandedGguf, setExpandedGguf] = useState<string | null>(null);
 
   const recommendedIds = useMemo(
     () => dedupe([...models.map((model) => model.id), value ?? ""]),
@@ -110,6 +257,19 @@ export function HubModelPicker({
   );
 
   const { scrollRef, sentinelRef } = useInfiniteScroll(fetchMore, results.length);
+
+  /** Handle clicking a model row — GGUF repos expand, others load directly. */
+  const handleModelClick = useCallback(
+    (id: string) => {
+      if (isGgufRepo(id)) {
+        // Toggle GGUF variant expander
+        setExpandedGguf((prev) => (prev === id ? null : id));
+      } else {
+        onSelect(id, { source: "hub", isLora: false });
+      }
+    },
+    [onSelect],
+  );
 
   return (
     <div className="space-y-2">
@@ -139,14 +299,29 @@ export function HubModelPicker({
                   No default models.
                 </div>
               ) : (
-                recommendedIds.map((id) => (
-                  <ModelRow
-                    key={id}
-                    label={id}
-                    selected={value === id}
-                    onClick={() => onSelect(id, { source: "hub", isLora: false })}
-                  />
-                ))
+                recommendedIds.map((id) => {
+                  const vram = recommendedVramMap.get(id);
+                  return (
+                    <div key={id}>
+                      <ModelRow
+                        label={id}
+                        meta={
+                          isGgufRepo(id)
+                            ? "GGUF"
+                            : vram?.detail ?? undefined
+                        }
+                        selected={value === id}
+                        onClick={() => handleModelClick(id)}
+                        vramStatus={isGgufRepo(id) ? null : vram?.status ?? null}
+                        vramEst={isGgufRepo(id) ? undefined : vram?.est}
+                        gpuGb={gpu.available ? gpu.memoryTotalGb : undefined}
+                      />
+                      {expandedGguf === id && (
+                        <GgufVariantExpander repoId={id} onSelect={onSelect} />
+                      )}
+                    </div>
+                  );
+                })
               )}
             </>
           ) : null}
@@ -159,15 +334,29 @@ export function HubModelPicker({
                   No matching models.
                 </div>
               ) : (
-                hfIds.map((id) => (
-                  <ModelRow
-                    key={id}
-                    label={id}
-                    meta={metricsById.get(id)}
-                    selected={value === id}
-                    onClick={() => onSelect(id, { source: "hub", isLora: false })}
-                  />
-                ))
+                hfIds.map((id) => {
+                  const vram = vramMap.get(id);
+                  return (
+                    <div key={id}>
+                      <ModelRow
+                        label={id}
+                        meta={
+                          isGgufRepo(id)
+                            ? "GGUF"
+                            : metricsById.get(id)
+                        }
+                        selected={value === id}
+                        onClick={() => handleModelClick(id)}
+                        vramStatus={isGgufRepo(id) ? null : vram?.status ?? null}
+                        vramEst={isGgufRepo(id) ? undefined : vram?.est}
+                        gpuGb={gpu.available ? gpu.memoryTotalGb : undefined}
+                      />
+                      {expandedGguf === id && (
+                        <GgufVariantExpander repoId={id} onSelect={onSelect} />
+                      )}
+                    </div>
+                  );
+                })
               )}
               <div ref={sentinelRef} className="h-px" />
               {isLoadingMore ? (
@@ -288,4 +477,3 @@ export function LoraModelPicker({
     </div>
   );
 }
-
