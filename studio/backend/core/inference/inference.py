@@ -6,8 +6,10 @@ from unsloth.chat_templates import get_chat_template
 from transformers import TextStreamer
 from peft import PeftModel, PeftModelForCausalLM
 
+import json
 import sys
 import torch
+from pathlib import Path
 from typing import Optional, Union, Generator, Tuple
 from utils.models import ModelConfig, get_base_model_from_lora
 from utils.paths import is_model_cached
@@ -106,6 +108,34 @@ class InferenceBackend:
 
                 # Apply inference optimization
                 FastVisionModel.for_inference(model)
+
+                # FastVisionModel may return a raw tokenizer (e.g. GemmaTokenizerFast)
+                # instead of a proper Processor for some models (e.g. Gemma-3).
+                # In that case, load the real processor from the base model.
+                from transformers import ProcessorMixin
+                if not (isinstance(processor, ProcessorMixin) or hasattr(processor, "image_processor")):
+                    # For LoRA adapters, use the base model. For local merged exports,
+                    # read export_metadata.json to find the original base model.
+                    processor_source = config.base_model if config.is_lora else config.identifier
+                    if not config.is_lora and config.is_local:
+                        _meta_path = Path(config.path) / "export_metadata.json"
+                        try:
+                            if _meta_path.exists():
+                                _meta = json.loads(_meta_path.read_text())
+                                if _meta.get("base_model"):
+                                    processor_source = _meta["base_model"]
+                        except Exception:
+                            pass
+                    logger.warning(
+                        f"FastVisionModel returned {type(processor).__name__} (no image_processor) "
+                        f"for '{model_name}' — loading proper processor from '{processor_source}'"
+                    )
+                    from transformers import AutoProcessor
+                    processor = AutoProcessor.from_pretrained(
+                        processor_source,
+                        token=hf_token if hf_token and hf_token.strip() else None,
+                    )
+                    logger.info(f"Loaded {type(processor).__name__} from {processor_source}")
 
                 self.models[model_name]["model"] = model
                 self.models[model_name]["tokenizer"] = processor
