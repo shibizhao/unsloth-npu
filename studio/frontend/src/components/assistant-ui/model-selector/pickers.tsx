@@ -39,14 +39,32 @@ function ModelRow({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors hover:bg-accent",
+        "flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors hover:bg-accent",
         selected && "bg-accent/60",
       )}
     >
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      {meta ? (
-        <span className="shrink-0 text-[10px] text-muted-foreground">{meta}</span>
-      ) : null}
+      <span
+        className={cn(
+          "block min-w-0 flex-1 truncate",
+          exceeds && "line-through decoration-muted-foreground/50",
+        )}
+      >
+        {label}
+      </span>
+      <span className="ml-auto flex items-center gap-1.5 shrink-0">
+        {vramStatus === "exceeds" && (
+          <span className="text-[9px] font-medium text-red-400">OOM</span>
+        )}
+        {vramStatus === "tight" && (
+          <span className="text-[9px] font-medium text-amber-400">TIGHT</span>
+        )}
+        {vramStatus === "fits" && (
+          <span className="text-[9px] font-medium text-emerald-500/90">FIT</span>
+        )}
+        {meta ? (
+          <span className="text-[10px] text-muted-foreground">{meta}</span>
+        ) : null}
+      </span>
     </button>
   );
 }
