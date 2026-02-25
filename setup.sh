@@ -174,7 +174,7 @@ install_python_stack() {
     curl -sSL "https://raw.githubusercontent.com/unslothai/unsloth-zoo/refs/heads/main/unsloth_zoo/llama_cpp.py" \
         -o "$LLAMA_CPP_DST"
     # Patch: override vision.py with fix from unsloth PR: https://github.com/unslothai/unsloth/pull/4091 until next pypi release
-    VISION_DST="$(pip show unsloth | grep -i '^Location:' | awk '{print $2}')/unsloth/models/vision.py"
+    VISION_DST="$(pip show unsloth | grep -i '^Location:' | awk '{print $2}')/unsloth/vision.py"
     curl -sSL "https://raw.githubusercontent.com/unslothai/unsloth/80e0108a684c882965a02a8ed851e3473c1145ab/unsloth/models/vision.py" \
         -o "$VISION_DST"
     echo "   Installing studio dependencies..."
