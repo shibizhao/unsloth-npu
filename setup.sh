@@ -174,7 +174,7 @@ install_python_stack() {
     curl -sSL "https://raw.githubusercontent.com/unslothai/unsloth-zoo/refs/heads/main/unsloth_zoo/llama_cpp.py" \
         -o "$LLAMA_CPP_DST"
     # Patch: override vision.py with fix from unsloth PR: https://github.com/unslothai/unsloth/pull/4091 until next pypi release
-    VISION_DST="$(pip show unsloth | grep -i '^Location:' | awk '{print $2}')/unsloth/vision.py"
+    VISION_DST="$(pip show unsloth | grep -i '^Location:' | awk '{print $2}')/unsloth/models/vision.py"
     curl -sSL "https://raw.githubusercontent.com/unslothai/unsloth/80e0108a684c882965a02a8ed851e3473c1145ab/unsloth/models/vision.py" \
         -o "$VISION_DST"
     echo "   Installing studio dependencies..."
@@ -197,7 +197,25 @@ else
     rm -rf .venv_overlay  # Clean up stale transformers version overlay
     "$BEST_PY" -m venv .venv
     source .venv/bin/activate
-    install_python_stack
+    run_quiet "pip upgrade" pip install --upgrade pip
+    echo "   Installing unsloth-zoo + unsloth..."
+    run_quiet "pip install unsloth" pip install -r "$SCRIPT_DIR/studio/backend/requirements/base.txt"
+    echo "   Installing additional unsloth dependencies..."
+    run_quiet "pip install extras" pip install --no-cache-dir -r "$SCRIPT_DIR/studio/backend/requirements/extras.txt"
+    run_quiet "pip install extras" pip install --no-deps --no-cache-dir -r "$SCRIPT_DIR/studio/backend/requirements/extras-no-deps.txt"
+    run_quiet "pip install torchao+transformers" pip install --force-reinstall --no-cache-dir -r "$SCRIPT_DIR/studio/backend/requirements/overrides.txt"
+    run_quiet "pip install triton_kernels" pip install --no-deps -r "$SCRIPT_DIR/studio/backend/requirements/triton-kernels.txt"
+    # Patch: override llama_cpp.py with fix from unsloth-zoo branch
+    LLAMA_CPP_DST="$(pip show unsloth-zoo | grep -i '^Location:' | awk '{print $2}')/unsloth_zoo/llama_cpp.py"
+    curl -sSL "https://raw.githubusercontent.com/unslothai/unsloth-zoo/refs/heads/main/unsloth_zoo/llama_cpp.py" \
+        -o "$LLAMA_CPP_DST"
+    # Patch: override vision.py with fix from unsloth PR: https://github.com/unslothai/unsloth/pull/4091 until next pypi release
+    VISION_DST="$(pip show unsloth | grep -i '^Location:' | awk '{print $2}')/unsloth/models/vision.py"
+    curl -sSL "https://raw.githubusercontent.com/unslothai/unsloth/80e0108a684c882965a02a8ed851e3473c1145ab/unsloth/models/vision.py" \
+        -o "$VISION_DST"
+    echo "   Installing studio dependencies..."
+    run_quiet "pip install studio" pip install -r "$SCRIPT_DIR/studio/backend/requirements/studio.txt"
+    echo "✅ Python dependencies installed"
     
     # ── 7. WSL: pre-install GGUF build dependencies ──
     # On WSL, sudo requires a password and can't be entered during GGUF export
