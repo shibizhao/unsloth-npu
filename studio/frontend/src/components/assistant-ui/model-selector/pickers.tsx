@@ -1,8 +1,5 @@
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-<<<<<<< HEAD
-import { useDebouncedValue, useHfModelSearch, useInfiniteScroll } from "@/hooks";
-=======
 import {
   Tooltip,
   TooltipContent,
@@ -17,7 +14,6 @@ import {
   useInfiniteScroll,
   useRecommendedModelVram,
 } from "@/hooks";
->>>>>>> ef1cd3ac (Use llama-server -hf mode, add GGUF variant selector, fix vision detection)
 import { cn, formatCompact } from "@/lib/utils";
 import { Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -54,11 +50,19 @@ function ModelRow({
   meta,
   selected,
   onClick,
+  vramStatus,
+  vramEst,
+  gpuGb,
+  tooltipText,
 }: {
   label: string;
   meta?: string;
   selected?: boolean;
   onClick: () => void;
+  vramStatus?: VramFitStatus | null;
+  vramEst?: number;
+  gpuGb?: number;
+  tooltipText?: ReactNode;
 }) {
   return (
     <button
@@ -157,71 +161,17 @@ function GgufVariantExpander({
     );
   }
 
-  if (error) {
+  if (tooltipText) {
     return (
-      <div className="px-5 py-2 text-xs text-destructive">{error}</div>
+      <Tooltip>
+        <TooltipTrigger asChild>{content}</TooltipTrigger>
+        <TooltipContent side="left" className="max-w-xs break-all">
+          {tooltipText}
+        </TooltipContent>
+      </Tooltip>
     );
   }
-
-  if (!variants || variants.length === 0) {
-    return (
-      <div className="px-5 py-2 text-xs text-muted-foreground">
-        No GGUF variants found.
-      </div>
-    );
-  }
-
-  return (
-    <div className="pl-4 border-l-2 border-accent/50 ml-3 my-1">
-      <div className="px-2 py-1 flex items-center gap-1.5">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Quantizations
-        </span>
-        {hasVision && (
-          <span className="text-[9px] font-medium text-blue-400">Vision</span>
-        )}
-      </div>
-      {variants.map((v) => {
-        const sizeGb = v.size_bytes / (1024 ** 3);
-        const fitStatus = gpuGb != null && gpuGb > 0 && sizeGb > 0
-          ? checkVramFit(sizeGb, gpuGb)
-          : null;
-        return (
-          <button
-            key={v.filename}
-            type="button"
-            onClick={() => handleVariantClick(v.quant)}
-            className={cn(
-              "flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1 text-left text-sm transition-colors hover:bg-accent",
-            )}
-          >
-            <span className="min-w-0 flex-1 truncate font-mono text-xs">
-              {v.quant}
-              {v.quant === defaultVariant && (
-                <span className="ml-1.5 text-[9px] font-sans font-medium text-primary/70">
-                  recommended
-                </span>
-              )}
-            </span>
-            <span className="flex items-center gap-1.5 shrink-0">
-              {fitStatus === "exceeds" && (
-                <span className="text-[9px] font-medium text-red-400">OOM</span>
-              )}
-              {fitStatus === "tight" && (
-                <span className="text-[9px] font-medium text-amber-400">TIGHT</span>
-              )}
-              {fitStatus === "fits" && (
-                <span className="text-[9px] font-medium text-emerald-500/90">FIT</span>
-              )}
-              <span className="text-[10px] text-muted-foreground">
-                {formatBytes(v.size_bytes)}
-              </span>
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
+  return content;
 }
 
 // ── Detect GGUF repos by naming convention ────────────────────
@@ -488,6 +438,14 @@ export function LoraModelPicker({
                         source: isExported ? "exported" : "lora",
                         isLora: !isMerged && !isGguf,
                       })}
+                      tooltipText={
+                        <>
+                          <span className="block break-words">{adapter.name}</span>
+                          <span className="block mt-1 text-[10px] text-muted-foreground break-all">
+                            {adapter.id}
+                          </span>
+                        </>
+                      }
                     />
                   );
                 })}
