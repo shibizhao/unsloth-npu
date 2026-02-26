@@ -203,7 +203,209 @@ class TrainingBackend:
         self._pump_thread = threading.Thread(target=self._pump_loop, daemon=True)
         self._pump_thread.start()
 
-        return True
+                       # NEW: Vision-specific LoRA parameters
+                       finetune_vision_layers: bool,
+                       finetune_language_layers: bool,
+                       finetune_attention_modules: bool,
+                       finetune_mlp_modules: bool,
+
+                       # Logging parameters
+                       enable_wandb: bool,
+                       wandb_token: str,
+                       wandb_project: str,
+                       enable_tensorboard: bool,
+                       tensorboard_dir: str,
+
+                       # Optional parameters
+                       custom_format_mapping: dict = None,
+                       subset: str = None,
+                       train_split: str = "train",
+                       eval_split: str = None,
+                       eval_steps: float = 0.00,
+                       is_dataset_multimodal: bool = False,
+                       is_dataset_audio: bool = False) -> bool:
+        """
+        Start training.
+
+        Returns:
+            True if training started successfully, False otherwise.
+        """
+        try:
+            # Wait for any previous training thread to finish
+            old_thread = getattr(self.trainer, "training_thread", None)
+            if old_thread and old_thread.is_alive():
+                logger.info("Waiting for previous training thread to finish...")
+                old_thread.join(timeout=30)
+
+            # Explicitly free old SFTTrainer and CUDA resources before loading new model.
+            # Without this, forked multiprocessing workers (num_proc tokenization) inherit
+            # stale CUDA state from the previous run, causing extreme slowdowns or crashes.
+            if self.trainer.trainer is not None:
+                logger.info("Cleaning up previous SFTTrainer...")
+                self.trainer.trainer = None
+            if self.trainer.model is not None:
+                self.trainer.model = None
+            if self.trainer.tokenizer is not None:
+                self.trainer.tokenizer = None
+            # Flush all pending async CUDA ops so forked tokenization processes
+            # don't inherit stale async state that causes pool join to hang.
+            import torch as _torch
+            if _torch.cuda.is_available():
+                _torch.cuda.synchronize()
+            # Reset torch dynamo/compiler caches — Unsloth's compiled SFTTrainer
+            # and model.for_training() set class-level state that persists between
+            # runs (e.g. BiCodec text trainer pollutes subsequent VLM runs).
+            _torch._dynamo.reset()
+            _torch.compiler.reset()
+            import gc
+            gc.collect()
+            clear_gpu_cache()
+
+            # Reset stop flag and clear history
+            self.trainer.should_stop = False
+            self.trainer.save_on_stop = True
+            self.loss_history = []
+            self.lr_history = []
+            self.step_history = []
+            self.grad_norm_history = []
+            self.grad_norm_step_history = []
+            self.eval_loss_history = []
+            self.eval_step_history = []
+            self.eval_enabled = False
+            import time
+            output_dir = f"./outputs/{model_name.replace('/', '_')}_{int(time.time())}"
+
+            # Derive use_lora from training_type
+            use_lora_actual = (training_type == "LoRA/QLoRA")
+            if use_lora_actual: print("using Lora")
+            else: print("using full finetuning")
+            logger.info(f"Starting training - Type: {training_type}, Model: {model_name}")
+
+            # ========== LOAD MODEL ==========
+            logger.info("Loading model...")
+            success = self.trainer.load_model(
+                model_name=model_name,
+                max_seq_length=max_seq_length,
+                load_in_4bit=load_in_4bit if use_lora_actual else False,  # Only 4bit for LoRA
+                hf_token=hf_token if hf_token.strip() else None,
+                is_dataset_multimodal=is_dataset_multimodal,
+                is_dataset_audio=is_dataset_audio,
+            )
+
+            if not success or self.trainer.should_stop:
+                logger.error("Failed to load model or stopped by user")
+                return False
+
+            # ========== PREPARE MODEL FOR TRAINING ==========
+            if use_lora_actual:
+                logger.info("Preparing model with LoRA...")
+                success = self.trainer.prepare_model_for_training(
+                    use_lora=True,
+                    # Vision-specific parameters
+                    finetune_vision_layers=finetune_vision_layers,
+                    finetune_language_layers=finetune_language_layers,
+                    finetune_attention_modules=finetune_attention_modules,
+                    finetune_mlp_modules=finetune_mlp_modules,
+                    # Standard LoRA parameters
+                    target_modules=target_modules,
+                    lora_r=lora_r,
+                    lora_alpha=lora_alpha,
+                    lora_dropout=lora_dropout,
+                    use_gradient_checkpointing=gradient_checkpointing,
+                    use_rslora=use_rslora,
+                    use_loftq=use_loftq
+                )
+            else:
+                logger.info("Preparing model for full finetuning...")
+                success = self.trainer.prepare_model_for_training(
+                    use_lora=False  # Full finetuning
+                )
+
+            if not success or self.trainer.should_stop:
+                logger.error("Failed to prepare model or stopped by user")
+                return False
+
+            # ========== LOAD DATASET ==========
+            logger.info("Loading dataset...")
+            #breakpoint()
+            dataset_result = self.trainer.load_and_format_dataset(
+                dataset_source=hf_dataset if hf_dataset.strip() else None,
+                format_type=format_type,
+                local_datasets=local_datasets if local_datasets else None,
+                custom_format_mapping=custom_format_mapping,
+                subset=subset,
+                train_split=train_split,
+                eval_split=eval_split,
+                eval_steps=eval_steps,
+            )
+
+            # Unpack: load_and_format_dataset returns (dataset, eval_dataset)
+            if isinstance(dataset_result, tuple):
+                dataset, eval_dataset = dataset_result
+            else:
+                dataset = dataset_result
+                eval_dataset = None
+
+            # Track whether eval is enabled for status reporting
+            self.eval_enabled = eval_dataset is not None
+
+            if dataset is None or self.trainer.should_stop:
+                logger.error("Failed to load dataset or stopped by user")
+                return False
+
+            # ========== START TRAINING ==========
+            # Convert learning rate string to float
+            try:
+                lr_value = float(learning_rate)
+            except ValueError:
+                logger.error(f"Invalid learning rate: {learning_rate}")
+                self.trainer._update_progress(
+                    error=f"Invalid learning rate: {learning_rate}",
+                    is_training=False
+                )
+                return
+
+            logger.info("Starting training worker thread...")
+            success = self.trainer.start_training(
+                dataset=dataset,
+                eval_dataset=eval_dataset,
+                eval_steps=eval_steps,
+                output_dir=output_dir,
+                num_epochs=num_epochs,
+                learning_rate=lr_value,
+                batch_size=batch_size,
+                gradient_accumulation_steps=gradient_accumulation_steps,
+                warmup_steps=warmup_steps,
+                warmup_ratio=warmup_ratio,
+                max_steps=max_steps if max_steps > 0 else 0,
+                save_steps=save_steps if save_steps > 0 else 0,
+                weight_decay=weight_decay,
+                random_seed=random_seed,
+                packing=packing,
+                train_on_completions=train_on_completions,
+                enable_wandb=enable_wandb,
+                wandb_project=wandb_project,
+                wandb_token=wandb_token if wandb_token.strip() else None,
+                enable_tensorboard=enable_tensorboard,
+                tensorboard_dir=tensorboard_dir,
+                max_seq_length=max_seq_length,
+                optim=optim,
+                lr_scheduler_type=lr_scheduler_type,
+            )
+
+            if not success:
+                logger.error("Failed to start training")
+                return False
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Error in start_training: {e}", exc_info=True)
+            self.trainer._update_progress(
+                error=str(e),
+                is_training=False
+            )
+            return False
 
     def stop_training(self, save: bool = True) -> bool:
         """Send stop signal to the training subprocess."""
