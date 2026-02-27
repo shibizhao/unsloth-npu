@@ -313,6 +313,7 @@ export function ChatPage(): ReactElement {
   );
   const inferenceParams = useChatRuntimeStore((state) => state.params);
   const setInferenceParams = useChatRuntimeStore((state) => state.setParams);
+  const activeGgufVariant = useChatRuntimeStore((state) => state.activeGgufVariant);
   const autoTitle = useChatRuntimeStore((state) => state.autoTitle);
   const setAutoTitle = useChatRuntimeStore((state) => state.setAutoTitle);
   const modelsFromStore = useChatRuntimeStore((state) => state.models);
@@ -334,9 +335,10 @@ export function ChatPage(): ReactElement {
 
   const handleCheckpointChange = useCallback(
     (value: string, meta?: { isLora: boolean; ggufVariant?: string }) => {
-      const currentCheckpoint =
-        useChatRuntimeStore.getState().params.checkpoint;
-      if (!value || value === currentCheckpoint) return;
+      const store = useChatRuntimeStore.getState();
+      const currentCheckpoint = store.params.checkpoint;
+      const currentVariant = store.activeGgufVariant;
+      if (!value || (value === currentCheckpoint && (meta?.ggufVariant ?? null) === (currentVariant ?? null))) return;
       void (async () => {
         let switchNote: string | undefined;
         const activeThreadId = await resolveActiveSingleThreadId(view);
@@ -569,32 +571,40 @@ export function ChatPage(): ReactElement {
           />
         </InlineSidebar>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="flex h-11 shrink-0 items-center px-1.5 sm:px-2">
-          <div className="flex items-center gap-1">
-            <SidebarTrigger />
-            <TopBarActions
-              onNewThread={handleNewThread}
-              onNewCompare={handleNewCompare}
-              showCompare={canCompare}
-            />
-            <ModelSelector
-              models={models}
-              loraModels={loraModels}
-              value={inferenceParams.checkpoint}
-              onValueChange={handleCheckpointChange}
-              onEject={handleEject}
-              variant="ghost"
-              open={modelSelectorOpen}
-              onOpenChange={handleModelSelectorOpenChange}
-              triggerDataTour="chat-model-selector"
-              contentDataTour="chat-model-selector-popover"
-              className="max-w-[62vw] sm:max-w-none"
-            />
-          </div>
-          {modelsError && (
-            <div className="ml-2 text-xs text-destructive truncate max-w-[28rem]">
-              {modelsError}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div className="flex h-11 shrink-0 items-center px-1.5 sm:px-2">
+            <div className="flex items-center gap-1">
+              <SidebarTrigger />
+              <TopBarActions
+                onNewThread={handleNewThread}
+                onNewCompare={handleNewCompare}
+                showCompare={canCompare}
+              />
+              <ModelSelector
+                models={models}
+                loraModels={loraModels}
+                value={inferenceParams.checkpoint}
+                activeGgufVariant={activeGgufVariant}
+                onValueChange={handleCheckpointChange}
+                onEject={handleEject}
+                variant="ghost"
+                open={modelSelectorOpen}
+                onOpenChange={handleModelSelectorOpenChange}
+                triggerDataTour="chat-model-selector"
+                contentDataTour="chat-model-selector-popover"
+                className="max-w-[62vw] sm:max-w-none"
+              />
+              {loadingModel ? (
+                <div
+                  className="flex items-center gap-1.5 text-muted-foreground"
+                  title={`Loading ${loadingModel.displayName}. This may include downloading.`}
+                >
+                  <Spinner className="size-3.5 shrink-0" />
+                  <span className="text-xs">
+                    Downloading model…
+                  </span>
+                </div>
+              ) : null}
             </div>
             {modelsError && (
               <div className="ml-2 text-xs text-destructive truncate max-w-[28rem]">
