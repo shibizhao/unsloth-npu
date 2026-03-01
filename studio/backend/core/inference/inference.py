@@ -118,22 +118,45 @@ class InferenceBackend:
                 elif audio_type == "bicodec":
                     import os
                     from unsloth import FastModel
-                    from huggingface_hub import snapshot_download
 
-                    # Spark-TTS: download full repo, then load from /LLM subfolder
-                    hf_repo = config.path
-                    local_dir = hf_repo.split("/")[-1]
-                    repo_path = snapshot_download(hf_repo, local_dir=local_dir)
-                    abs_repo_path = os.path.abspath(repo_path)
-                    llm_path = os.path.join(abs_repo_path, "LLM")
-                    logger.info(f"Spark-TTS: downloaded repo to {repo_path}, loading LLM from {llm_path}")
+                    if config.is_lora and config.base_model:
+                        # LoRA adapter: load from local adapter path.
+                        # base_model is e.g. /home/.../Spark-TTS-0.5B/LLM
+                        # The BiCodec weights are in the parent dir (Spark-TTS-0.5B/).
+                        base_path = config.base_model
+                        if os.path.isdir(base_path):
+                            abs_repo_path = os.path.abspath(os.path.dirname(base_path))
+                        else:
+                            # base_model is an HF ID — download it
+                            from huggingface_hub import snapshot_download
+                            local_dir = base_path.split("/")[-1]
+                            repo_path = snapshot_download(base_path, local_dir=local_dir)
+                            abs_repo_path = os.path.abspath(repo_path)
 
-                    model, tokenizer = FastModel.from_pretrained(
-                        llm_path,
-                        dtype=torch.float32,
-                        load_in_4bit=False,
-                        token=hf_token if hf_token and hf_token.strip() else None,
-                    )
+                        logger.info(f"Spark-TTS LoRA: loading adapter from {config.path}, BiCodec from {abs_repo_path}")
+                        model, tokenizer = FastModel.from_pretrained(
+                            config.path,
+                            dtype=torch.float32,
+                            load_in_4bit=False,
+                            token=hf_token if hf_token and hf_token.strip() else None,
+                        )
+                    else:
+                        # Base model: download full HF repo, then load from /LLM subfolder
+                        from huggingface_hub import snapshot_download
+                        hf_repo = config.path
+                        local_dir = hf_repo.split("/")[-1]
+                        repo_path = snapshot_download(hf_repo, local_dir=local_dir)
+                        abs_repo_path = os.path.abspath(repo_path)
+                        llm_path = os.path.join(abs_repo_path, "LLM")
+                        logger.info(f"Spark-TTS: downloaded repo to {repo_path}, loading LLM from {llm_path}")
+
+                        model, tokenizer = FastModel.from_pretrained(
+                            llm_path,
+                            dtype=torch.float32,
+                            load_in_4bit=False,
+                            token=hf_token if hf_token and hf_token.strip() else None,
+                        )
+
                     FastModel.for_inference(model)
                     self.models[model_name]["model"] = model
                     self.models[model_name]["tokenizer"] = tokenizer
@@ -150,6 +173,35 @@ class InferenceBackend:
                     FastModel.for_inference(model)
                     self.models[model_name]["model"] = model
                     self.models[model_name]["tokenizer"] = tokenizer
+                elif audio_type == "whisper":
+                    # Whisper ASR — uses FastModel with WhisperForConditionalGeneration
+                    from unsloth import FastModel
+                    from transformers import WhisperForConditionalGeneration
+                    model, tokenizer = FastModel.from_pretrained(
+                        config.path,
+                        auto_model=WhisperForConditionalGeneration,
+                        whisper_language="English",
+                        whisper_task="transcribe",
+                        load_in_4bit=False,
+                        token=hf_token if hf_token and hf_token.strip() else None,
+                    )
+                    FastModel.for_inference(model)
+                    model.eval()
+
+                    # Create ASR pipeline (per notebook)
+                    from transformers import pipeline as hf_pipeline
+                    whisper_pipe = hf_pipeline(
+                        "automatic-speech-recognition",
+                        model=model,
+                        tokenizer=tokenizer.tokenizer,
+                        feature_extractor=tokenizer.feature_extractor,
+                        processor=tokenizer,
+                        return_language=True,
+                        torch_dtype=torch.float16,
+                    )
+                    self.models[model_name]["model"] = model
+                    self.models[model_name]["tokenizer"] = tokenizer
+                    self.models[model_name]["whisper_pipeline"] = whisper_pipe
                 else:
                     # SNAC (Orpheus) uses FastLanguageModel
                     model, tokenizer = FastLanguageModel.from_pretrained(
@@ -162,9 +214,10 @@ class InferenceBackend:
                     self.models[model_name]["model"] = model
                     self.models[model_name]["tokenizer"] = tokenizer
 
-                # Load the external codec for this audio type
-                model_repo_path = self.models[model_name].get("model_repo_path")
-                self._audio_codec_manager.load_codec(audio_type, self.device, model_repo_path=model_repo_path)
+                # Load the external codec for TTS audio types (Whisper is ASR, no codec needed)
+                if audio_type != "whisper":
+                    model_repo_path = self.models[model_name].get("model_repo_path")
+                    self._audio_codec_manager.load_codec(audio_type, self.device, model_repo_path=model_repo_path)
 
                 self.active_model_name = model_name
                 self.loading_models.discard(model_name)
@@ -259,9 +312,7 @@ class InferenceBackend:
             self.loading_models.discard(model_name)
 
             raise Exception(error_msg)
-    pass
 
-    # Add this new function
     def unload_model(self, model_name: str) -> bool:
         """
         Completely removes a model from the registry and clears GPU memory.
@@ -295,7 +346,6 @@ class InferenceBackend:
         else:
             logger.warning(f"Attempted to unload model '{model_name}', but it was not found in the registry.")
             return True
-    pass
 
     def revert_to_base_model(self, base_model_name: str) -> bool:
         """
@@ -329,61 +379,6 @@ class InferenceBackend:
             logger.error(f"Failed to revert model to base state: {e}")
             import traceback
             logger.error(traceback.format_exc())
-            return False
-
-    def activate_lora_adapter(self, base_model_name: str, lora_path: str) -> Tuple[bool, Optional[str]]:
-        """
-        Activates a specific LoRA adapter on what is assumed to be a clean base model.
-        Uses PeftModel.from_pretrained() which correctly wraps the base model.
-        """
-        model = self.models[base_model_name].get("model")
-        adapter_name_to_load = lora_path.split("/")[-1].replace(".", "_")
-
-        try:
-            # Use PeftModel.from_pretrained to wrap the clean base model with the adapter.
-            # This is the correct approach after model.unload() + del peft_config.
-            logger.info(f"Loading LoRA adapter '{adapter_name_to_load}' from '{lora_path}'...")
-            model = PeftModel.from_pretrained(model, lora_path, adapter_name=adapter_name_to_load)
-            self.models[base_model_name]["model"] = model
-            logger.info(f"LoRA adapter '{adapter_name_to_load}' activated successfully.")
-
-            return True, adapter_name_to_load
-        except Exception as e:
-            logger.error(f"Failed to activate LoRA adapter '{adapter_name_to_load}': {e}")
-            import traceback
-            logger.error(traceback.format_exc())
-            return False, None
-
-    def enable_adapter(self, base_model_name: str, adapter_name: str) -> bool:
-        """Enable specific adapter (for generation)"""
-        if base_model_name not in self.models:
-            return False
-
-        model = self.models[base_model_name]["model"]
-
-        try:
-            logger.info(f"Enabling adapter: {adapter_name}")
-            model.set_adapter(adapter_name)
-            self.models[base_model_name]["active_adapter"] = adapter_name
-            return True
-        except Exception as e:
-            logger.error(f"Failed to enable adapter: {e}")
-            return False
-
-    def disable_adapters(self, base_model_name: str) -> bool:
-        """Disable all adapters (back to pure base model)"""
-        if base_model_name not in self.models:
-            return False
-
-        model = self.models[base_model_name]["model"]
-
-        try:
-            logger.info(f"Disabling all adapters on {base_model_name}")
-            model.disable_adapters()
-            self.models[base_model_name]["active_adapter"] = None
-            return True
-        except Exception as e:
-            logger.error(f"Failed to disable adapters: {e}")
             return False
 
     def load_for_eval(self, lora_path: str, max_seq_length: int = 2048,
@@ -432,7 +427,6 @@ class InferenceBackend:
             import traceback
             logger.error(traceback.format_exc())
             return False, None, None
-    pass
 
     def load_adapter(self, base_model_name: str, adapter_path: str, adapter_name: str) -> bool:
         """
@@ -460,7 +454,6 @@ class InferenceBackend:
         except Exception as e:
             logger.error(f"Failed to load adapter '{adapter_name}': {e}")
             return False
-    pass
 
     def set_active_adapter(self, base_model_name: str, adapter_name: str) -> bool:
         """
@@ -476,7 +469,6 @@ class InferenceBackend:
             # This will catch the "adapter not found" error if something goes wrong.
             logger.error(f"Failed to set active adapter to '{adapter_name}': {e}")
             return False
-    pass
 
     def _apply_adapter_state(self, use_adapter: Optional[Union[bool, str]]) -> None:
         """
@@ -773,7 +765,6 @@ class InferenceBackend:
         except Exception as e:
             logger.error(f"Vision generation error: {e}")
             yield f"Error: {str(e)}"
-    pass
 
     def generate_audio_input_response(self, messages, system_prompt, audio_array,
                                        temperature, top_p, top_k, min_p,
@@ -791,25 +782,29 @@ class InferenceBackend:
         processor = model_info.get("processor") or model_info.get("tokenizer")
         raw_tokenizer = getattr(processor, "tokenizer", processor)
 
-        # Extract last user text
-        user_text = "Transcribe this audio."
+        # Extract last user text — default matches notebook prompt
+        user_text = "Please transcribe this audio."
         if messages:
             for msg in reversed(messages):
                 if msg["role"] == "user" and msg.get("content"):
                     user_text = msg["content"]
                     break
 
+        # Use ASR-specific system prompt if user hasn't set a custom one
+        if not system_prompt or system_prompt == "You are a helpful AI assistant.":
+            system_prompt = "You are an assistant that transcribes speech accurately."
+
         # Build messages in Gemma 3n format — audio goes INTO apply_chat_template
-        audio_messages = []
-        if system_prompt:
-            audio_messages.append({"role": "system", "content": [{"type": "text", "text": system_prompt}]})
-        audio_messages.append({
-            "role": "user",
-            "content": [
-                {"type": "audio", "audio": audio_array},
-                {"type": "text", "text": user_text},
-            ],
-        })
+        audio_messages = [
+            {"role": "system", "content": [{"type": "text", "text": system_prompt}]},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "audio", "audio": audio_array},
+                    {"type": "text", "text": user_text},
+                ],
+            },
+        ]
 
         # apply_chat_template handles audio embedding + tokenization in one step
         inputs = processor.apply_chat_template(
@@ -831,16 +826,13 @@ class InferenceBackend:
                 timeout=0.2,
             )
 
+            # Notebook uses do_sample=False for ASR (greedy decoding for accuracy)
             generation_kwargs = dict(
                 **inputs,
                 streamer=streamer,
                 max_new_tokens=max_new_tokens,
                 use_cache=True,
-                do_sample=temperature > 0,
-                temperature=temperature,
-                top_p=top_p,
-                top_k=top_k,
-                min_p=min_p,
+                do_sample=False,
             )
 
             err: dict[str, str] = {}
@@ -889,6 +881,28 @@ class InferenceBackend:
 
         except Exception as e:
             logger.error(f"Audio input generation error: {e}")
+            yield f"Error: {str(e)}"
+
+    def generate_whisper_response(self, audio_array, cancel_event=None) -> Generator[str, None, None]:
+        """Whisper ASR — takes audio numpy array, yields transcribed text.
+
+        Uses the pre-built transformers pipeline (created during model loading).
+        """
+        model_info = self.models[self.active_model_name]
+        whisper_pipe = model_info.get("whisper_pipeline")
+        if not whisper_pipe:
+            yield "Error: Whisper pipeline not initialized"
+            return
+
+        try:
+            with self._generation_lock:
+                result = whisper_pipe({"raw": audio_array, "sampling_rate": 16000})
+
+            text = result.get("text", "") if isinstance(result, dict) else str(result)
+            if text:
+                yield text
+        except Exception as e:
+            logger.error(f"Whisper ASR error: {e}")
             yield f"Error: {str(e)}"
 
     def generate_stream(self,
@@ -1007,9 +1021,6 @@ class InferenceBackend:
         except Exception as e:
             logger.error(f"Error during generation: {e}")
             yield f"Error: {str(e)}"
-
-    # ... other helper methods (format_chat_prompt, _clean_generated_text, etc.)
-    pass
 
     # ── Audio (TTS) Generation ────────────────────────────────────
 
@@ -1390,7 +1401,6 @@ class InferenceBackend:
             logger.debug(f"Reset generation state for model: {model_name}")
         except Exception as e:
             logger.warning(f"Could not fully reset model state for {model_name}: {e}")
-    pass
 
     def reset_generation_state(self):
         """Reset any cached generation state to prevent hanging after errors"""
@@ -1528,10 +1538,17 @@ class InferenceBackend:
         return next(iter(self.loading_models)) if self.loading_models else None
 
     def load_model_simple(self,
+<<<<<<< HEAD
                      model_path: str,
                      hf_token: Optional[str] = None,
                      max_seq_length: int = 2048,
                      load_in_4bit: bool = True) -> bool:
+=======
+                         model_path: str,
+                         hf_token: Optional[str] = None,
+                         max_seq_length: int = 2048,
+                         load_in_4bit: bool = True) -> bool:
+>>>>>>> c636fd5a (code cleanup)
         """
         Simple model loading wrapper for chat interface.
         Accepts model path as string and handles ModelConfig creation internally.
@@ -1546,10 +1563,13 @@ class InferenceBackend:
             bool: True if successful, False otherwise
         """
         try:
+<<<<<<< HEAD
             from backend.model_config import ModelConfig
 
             logger.info(f"load_model_simple called with: {model_path}")
 
+=======
+>>>>>>> c636fd5a (code cleanup)
             # Create config from string path
             config = ModelConfig.from_ui_selection(
                 model_path,
@@ -1557,8 +1577,11 @@ class InferenceBackend:
                 is_lora=False
             )
 
+<<<<<<< HEAD
             logger.info(f"Created ModelConfig with identifier: {config.identifier}")
 
+=======
+>>>>>>> c636fd5a (code cleanup)
             # Call existing load_model with config
             return self.load_model(
                 config=config,
@@ -1570,12 +1593,17 @@ class InferenceBackend:
 
         except Exception as e:
             logger.error(f"Error in load_model_simple: {e}")
+<<<<<<< HEAD
             import traceback
             traceback.print_exc()
             return False
 
 pass
 
+=======
+            return False
+
+>>>>>>> c636fd5a (code cleanup)
 
 # Global inference backend instance
 inference_backend = InferenceBackend()
