@@ -88,9 +88,6 @@ function ModelRow({
         {vramStatus === "tight" && (
           <span className="text-[9px] font-medium text-amber-400">TIGHT</span>
         )}
-        {vramStatus === "fits" && (
-          <span className="text-[9px] font-medium text-emerald-500/90">FIT</span>
-        )}
         {meta ? (
           <span className="text-[10px] text-muted-foreground">{meta}</span>
         ) : null}
@@ -171,7 +168,63 @@ function GgufVariantExpander({
       </Tooltip>
     );
   }
-  return content;
+
+  if (!variants || variants.length === 0) {
+    return (
+      <div className="px-5 py-2 text-xs text-muted-foreground">
+        No GGUF variants found.
+      </div>
+    );
+  }
+
+  return (
+    <div className="pl-4 border-l-2 border-accent/50 ml-3 my-1">
+      <div className="px-2 py-1 flex items-center gap-1.5">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Quantizations
+        </span>
+        {hasVision && (
+          <span className="text-[9px] font-medium text-blue-400">Vision</span>
+        )}
+      </div>
+      {variants.map((v) => {
+        const sizeGb = v.size_bytes / (1024 ** 3);
+        const fitStatus = gpuGb != null && gpuGb > 0 && sizeGb > 0
+          ? checkVramFit(sizeGb, gpuGb)
+          : null;
+        return (
+          <button
+            key={v.filename}
+            type="button"
+            onClick={() => handleVariantClick(v.quant)}
+            className={cn(
+              "flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1 text-left text-sm transition-colors hover:bg-accent",
+            )}
+          >
+            <span className="min-w-0 flex-1 truncate font-mono text-xs">
+              {v.quant}
+              {v.quant === defaultVariant && (
+                <span className="ml-1.5 text-[9px] font-sans font-medium text-primary/70">
+                  recommended
+                </span>
+              )}
+            </span>
+            <span className="flex items-center gap-1.5 shrink-0">
+              {fitStatus === "exceeds" && (
+                <span className="text-[9px] font-medium text-red-400">OOM</span>
+              )}
+              {fitStatus === "tight" && (
+                <span className="text-[9px] font-medium text-amber-400">TIGHT</span>
+              )}
+              <span className="text-[10px] text-muted-foreground">
+                {formatBytes(v.size_bytes)}
+              </span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 // ── Detect GGUF repos by naming convention ────────────────────
