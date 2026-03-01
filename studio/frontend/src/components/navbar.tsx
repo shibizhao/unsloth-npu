@@ -24,7 +24,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useTrainingRuntimeStore } from "@/features/training";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import { useState } from "react";
 import { TOUR_OPEN_EVENT } from "@/features/tour";
 
@@ -57,10 +57,10 @@ export function Navbar() {
   };
 
   return (
-    <header className="top-0 z-40 h-16 w-full">
-      <div className="mx-auto flex h-full max-w-7xl items-center justify-between px-4 sm:px-6">
+    <header className="relative top-0 z-40 h-16 w-full">
+      <div className="mx-auto grid h-full max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-4 sm:px-6">
         {/* Left: logo */}
-        <Link to="/studio" className="flex items-center select-none">
+        <Link to="/studio" className="flex items-center justify-self-start select-none">
           <img
             src="/blacklogo.png"
             alt="Unsloth"
@@ -118,23 +118,21 @@ export function Navbar() {
                   />
                 )}
                 <span className="relative z-10 flex items-center gap-1.5">
-                  <AnimatePresence mode="popLayout">
-                    {active && item.icon && (
-                      <motion.span
-                        key={item.href}
-                        initial={{ width: 0, opacity: 0 }}
-                        animate={{ width: "auto", opacity: 1 }}
-                        exit={{ width: 0, opacity: 0 }}
-                        transition={{ duration: 0.2, ease: [0.165, 0.84, 0.44, 1] }}
-                        className="overflow-hidden"
-                      >
-                        <HugeiconsIcon
-                          icon={item.icon}
-                          className="size-3.5 -mt-px"
-                        />
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
+                  <span className="inline-flex size-3.5 items-center justify-center overflow-hidden">
+                    <motion.span
+                      initial={false}
+                      animate={{
+                        opacity: active ? 1 : 0,
+                        scale: active ? 1 : 0.9,
+                      }}
+                      transition={{ duration: 0.2, ease: [0.165, 0.84, 0.44, 1] }}
+                    >
+                      <HugeiconsIcon
+                        icon={item.icon}
+                        className="size-3.5 -mt-px"
+                      />
+                    </motion.span>
+                  </span>
                   {item.label}
                 </span>
               </Link>
@@ -143,7 +141,7 @@ export function Navbar() {
         </nav>
 
         {/* Right: docs/tour desktop */}
-        <div className="hidden items-center gap-2 md:flex">
+        <div className="hidden items-center justify-self-end gap-2 md:flex">
           <AnimatedThemeToggler
             className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground [&_svg]:size-4"
             title="Toggle theme"
@@ -183,17 +181,20 @@ export function Navbar() {
             </HoverCardContent>
           </HoverCard>
 
-          {tourId ? (
-            <button
-              type="button"
-              onClick={openTour}
-              className="flex h-9 items-center gap-1.5 rounded-md px-3 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              title="Tour"
-            >
-              <HugeiconsIcon icon={CursorInfo02Icon} className="size-4" />
-              <span className="text-sm font-medium">Tour</span>
-            </button>
-          ) : null}
+          <button
+            type="button"
+            onClick={tourId ? openTour : undefined}
+            className={cn(
+              "flex h-9 items-center gap-1.5 rounded-md px-3 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+              !tourId && "invisible pointer-events-none",
+            )}
+            title="Tour"
+            aria-hidden={!tourId}
+            tabIndex={tourId ? 0 : -1}
+          >
+            <HugeiconsIcon icon={CursorInfo02Icon} className="size-4" />
+            <span className="text-sm font-medium">Tour</span>
+          </button>
         </div>
 
         {/* Right: mobile */}
