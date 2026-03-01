@@ -1,7 +1,8 @@
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { Button } from "@/components/ui/button";
 import { useAui } from "@assistant-ui/react";
-import { ArrowUpIcon, SquareIcon } from "lucide-react";
+import { ArrowUpIcon, HeadphonesIcon, MicIcon, PlusIcon, SquareIcon, XIcon } from "lucide-react";
+import { useChatRuntimeStore } from "./stores/chat-runtime-store";
 import {
   type KeyboardEvent,
   type MutableRefObject,
@@ -14,10 +15,89 @@ import {
   useState,
 } from "react";
 
+export type CompareMessagePart =
+  | { type: "text"; text: string }
+  | { type: "image"; image: string }
+  | { type: "audio"; audio: string };
+
 export interface CompareHandle {
   append: (content: { type: "text"; text: string }[]) => void;
   cancel: () => void;
   isRunning: () => boolean;
+}
+
+const IMAGE_ACCEPT = "image/jpeg,image/png,image/webp,image/gif";
+const MAX_IMAGE_SIZE = 20 * 1024 * 1024;
+const AUDIO_ACCEPT = "audio/wav,audio/mpeg,audio/webm,audio/ogg,audio/flac,audio/mp4";
+const MAX_AUDIO_SIZE = 50 * 1024 * 1024;
+
+function fileToBase64DataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Failed to read image file"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function useDictation(
+  setText: (value: string | ((prev: string) => string)) => void,
+) {
+  const [isDictating, setIsDictating] = useState(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+  const start = useCallback(() => {
+    const SpeechRecognitionAPI =
+      typeof window !== "undefined" &&
+      (window.SpeechRecognition ?? (window as unknown as { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition);
+    if (!SpeechRecognitionAPI) {
+      return;
+    }
+    const recognition = new SpeechRecognitionAPI() as SpeechRecognition;
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      const last = event.resultIndex;
+      const result = event.results[last];
+      if (!result?.isFinal) return;
+      const transcript = result[0]?.transcript?.trim();
+      if (transcript) {
+        setText((prev) => (prev ? `${prev} ${transcript}` : transcript));
+      }
+    };
+    recognition.onerror = () => {
+      setIsDictating(false);
+    };
+    recognition.onend = () => {
+      setIsDictating(false);
+    };
+    recognition.start();
+    recognitionRef.current = recognition;
+    setIsDictating(true);
+  }, [setText]);
+
+  const stop = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    setIsDictating(false);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+      }
+    };
+  }, []);
+
+  const supported =
+    typeof window !== "undefined" &&
+    !!(window.SpeechRecognition ?? (window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition);
+
+  return { isDictating, start, stop, supported };
 }
 
 export type CompareHandles = MutableRefObject<Record<string, CompareHandle>>;
@@ -73,7 +153,23 @@ export function SharedComposer({
 }): ReactElement {
   const [text, setText] = useState("");
   const [running, setRunning] = useState(false);
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  const [pendingAudio, setPendingAudio] = useState<{ name: string; base64: string } | null>(null);
+  const [dragging, setDragging] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
+
+  const activeModel = useChatRuntimeStore((s) => {
+    const checkpoint = s.params.checkpoint;
+    return s.models.find((m) => m.id === checkpoint);
+  });
+  const setPendingAudioStore = useChatRuntimeStore((s) => s.setPendingAudio);
+  const clearPendingAudioStore = useChatRuntimeStore((s) => s.clearPendingAudio);
+
+  const { isDictating, start: startDictation, stop: stopDictation, supported: dictationSupported } = useDictation(
+    setText,
+  );
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -84,11 +180,57 @@ export function SharedComposer({
     return () => clearInterval(id);
   }, [handlesRef]);
 
-  function send() {
-    const msg = text.trim();
-    if (!msg) {
-      return;
+  const addFiles = useCallback((files: FileList | null) => {
+    if (!files?.length) return;
+    const next: PendingImage[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (!file) continue;
+      // Handle audio files
+      if (file.type.match(/^audio\//i) && file.size <= MAX_AUDIO_SIZE) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          const commaIndex = result.indexOf(",");
+          const base64 = commaIndex >= 0 ? result.slice(commaIndex + 1) : result;
+          setPendingAudio({ name: file.name, base64 });
+          setPendingAudioStore(base64, file.name);
+        };
+        reader.readAsDataURL(file);
+        continue;
+      }
+      // Handle image files
+      if (!file.type.match(/^image\/(jpeg|png|webp|gif)$/i)) continue;
+      if (file.size > MAX_IMAGE_SIZE) continue;
+      next.push({ id: crypto.randomUUID(), file });
     }
+    setPendingImages((prev) => [...prev, ...next]);
+  }, [setPendingAudioStore]);
+
+  const removePendingImage = useCallback((id: string) => {
+    setPendingImages((prev) => prev.filter((p) => p.id !== id));
+  }, []);
+
+  async function send() {
+    const msg = text.trim();
+    if (!msg && pendingImages.length === 0 && !pendingAudio) return;
+
+    const content: CompareMessagePart[] = [];
+    for (const { file } of pendingImages) {
+      try {
+        const image = await fileToBase64DataURL(file);
+        content.push({ type: "image", image });
+      } catch {
+        // skip failed image
+      }
+    }
+    if (pendingAudio) {
+      content.push({ type: "audio", audio: pendingAudio.base64 });
+    }
+    if (msg) {
+      content.push({ type: "text", text: msg });
+    }
+    if (content.length === 0) return;
 
     const content: { type: "text"; text: string }[] = [
       { type: "text", text: msg },
@@ -97,6 +239,9 @@ export function SharedComposer({
       handle.append(content);
     }
     setText("");
+    setPendingImages([]);
+    setPendingAudio(null);
+    clearPendingAudioStore();
     textareaRef.current?.focus();
   }
 
@@ -115,8 +260,47 @@ export function SharedComposer({
     }
   }
 
+  const canSend = (text.trim().length > 0 || pendingImages.length > 0 || pendingAudio !== null) && !running;
+
   return (
-    <div className="shadow-border ring-1 ring-border relative flex w-full flex-col rounded-2xl bg-background px-1 pt-2 transition-shadow">
+    <div
+      className={`shadow-border ring-1 ring-border relative flex w-full flex-col rounded-2xl bg-background px-1 pt-2 transition-shadow outline-none ${dragging ? "ring-ring bg-accent/50" : ""}`}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragging(false);
+        addFiles(e.dataTransfer.files);
+      }}
+    >
+      {(pendingImages.length > 0 || pendingAudio) && (
+        <div className="mb-2 flex w-full flex-row flex-wrap items-center gap-2 px-1.5 pt-0.5 pb-1">
+          {pendingImages.map(({ id, file }) => (
+            <PendingImageThumb
+              key={id}
+              file={file}
+              onRemove={() => removePendingImage(id)}
+            />
+          ))}
+          {pendingAudio && (
+            <div className="flex items-center gap-2 rounded-lg border border-foreground/20 bg-muted px-3 py-1.5 text-xs">
+              <HeadphonesIcon className="size-3.5 text-muted-foreground" />
+              <span className="max-w-48 truncate">{pendingAudio.name}</span>
+              <button
+                type="button"
+                onClick={() => { setPendingAudio(null); clearPendingAudioStore(); }}
+                className="flex size-4 items-center justify-center rounded-full hover:bg-destructive hover:text-destructive-foreground"
+                aria-label="Remove audio"
+              >
+                <XIcon className="size-3" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       <textarea
         ref={textareaRef}
         value={text}
@@ -149,7 +333,86 @@ export function SharedComposer({
           >
             <ArrowUpIcon className="size-4" />
           </TooltipIconButton>
-        )}
+          {activeModel?.hasAudioInput && (
+            <>
+              <input
+                ref={audioInputRef}
+                type="file"
+                accept={AUDIO_ACCEPT}
+                className="hidden"
+                onChange={(e) => {
+                  addFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              <TooltipIconButton
+                tooltip="Upload audio"
+                side="bottom"
+                variant="ghost"
+                size="icon"
+                className="size-8 rounded-full text-muted-foreground hover:bg-muted-foreground/15"
+                onClick={() => audioInputRef.current?.click()}
+                aria-label="Upload audio"
+              >
+                <HeadphonesIcon className="size-4 stroke-[1.5px]" />
+              </TooltipIconButton>
+            </>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          {dictationSupported && (
+            <>
+              {!isDictating ? (
+                <TooltipIconButton
+                  tooltip="Dictate"
+                  side="bottom"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 rounded-full text-muted-foreground hover:bg-muted-foreground/15"
+                  onClick={startDictation}
+                  aria-label="Dictate"
+                >
+                  <MicIcon className="size-4" />
+                </TooltipIconButton>
+              ) : (
+                <TooltipIconButton
+                  tooltip="Stop dictation"
+                  side="bottom"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 rounded-full text-destructive"
+                  onClick={stopDictation}
+                  aria-label="Stop dictation"
+                >
+                  <SquareIcon className="size-3 animate-pulse fill-current" />
+                </TooltipIconButton>
+              )}
+            </>
+          )}
+          {running ? (
+            <Button
+              type="button"
+              variant="default"
+              size="icon"
+              className="size-8 rounded-full"
+              onClick={stop}
+            >
+              <SquareIcon className="size-3 fill-current" />
+            </Button>
+          ) : (
+            <TooltipIconButton
+              tooltip="Send message"
+              side="bottom"
+              variant="default"
+              size="icon"
+              className="size-8 rounded-full"
+              onClick={send}
+              disabled={!canSend}
+            >
+              <ArrowUpIcon className="size-4" />
+            </TooltipIconButton>
+          )}
+        </div>
       </div>
     </div>
   );
