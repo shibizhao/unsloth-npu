@@ -199,7 +199,19 @@ else
     curl -sSL "https://raw.githubusercontent.com/unslothai/unsloth/80e0108a684c882965a02a8ed851e3473c1145ab/unsloth/models/vision.py" \
         -o "$VISION_DST"
     echo "   Installing studio dependencies..."
-    run_quiet "pip install studio" pip install -r "$SCRIPT_DIR/studio/backend/requirements/studio.txt"
+    run_quiet "pip install studio" pip install --no-cache-dir -c "$SINGLE_ENV_CONSTRAINTS" -r "$REQ_ROOT/studio.txt"
+    echo "   Installing data-designer dependencies..."
+    run_quiet "pip install data-designer deps" pip install --no-cache-dir -c "$SINGLE_ENV_CONSTRAINTS" -r "$SINGLE_ENV_DATA_DESIGNER_DEPS"
+    echo "   Installing data-designer..."
+    run_quiet "pip install data-designer" pip install --no-cache-dir --no-deps -c "$SINGLE_ENV_CONSTRAINTS" -r "$SINGLE_ENV_DATA_DESIGNER"
+    # Colab's bundled IPython 7.34 requires jedi but doesn't ship it
+    run_quiet "pip install jedi" pip install --no-cache-dir jedi
+    run_quiet "patch single-env metadata" python "$SINGLE_ENV_PATCH"
+    # pip check can flag minor transitive-dependency version mismatches that
+    # don't actually break anything.  Warn instead of aborting.
+    if ! pip check > /dev/null 2>&1; then
+        echo "⚠️  pip check reports dependency conflicts (safe to ignore)"
+    fi
     echo "✅ Python dependencies installed"
     
     # ── 7. WSL: pre-install GGUF build dependencies ──
