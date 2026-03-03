@@ -168,9 +168,35 @@ SINGLE_ENV_CONSTRAINTS="$REQ_ROOT/single-env/constraints.txt"
 SINGLE_ENV_DATA_DESIGNER="$REQ_ROOT/single-env/data-designer.txt"
 SINGLE_ENV_DATA_DESIGNER_DEPS="$REQ_ROOT/single-env/data-designer-deps.txt"
 SINGLE_ENV_PATCH="$REQ_ROOT/single-env/patch_metadata.py"
+LOCAL_DD_UNSTRUCTURED_PLUGIN="$SCRIPT_DIR/studio/backend/plugins/data-designer-unstructured-seed"
 
 install_python_stack() {
-    python "$SCRIPT_DIR/install_python_stack.py"
+    run_quiet "pip upgrade" pip install --upgrade pip
+    echo "   Installing unsloth-zoo + unsloth..."
+    run_quiet "pip install unsloth" pip install --no-cache-dir -c "$SINGLE_ENV_CONSTRAINTS" -r "$REQ_ROOT/base.txt"
+    echo "   Installing additional unsloth dependencies..."
+    run_quiet "pip install extras" pip install --no-cache-dir -c "$SINGLE_ENV_CONSTRAINTS" -r "$REQ_ROOT/extras.txt"
+    run_quiet "pip install torchao+transformers" pip install --force-reinstall --no-cache-dir -c "$SINGLE_ENV_CONSTRAINTS" -r "$REQ_ROOT/overrides.txt"
+    run_quiet "pip install triton_kernels" pip install --no-deps --no-cache-dir -r "$REQ_ROOT/triton-kernels.txt"
+    # Patch: override llama_cpp.py with fix from unsloth-zoo branch
+    LLAMA_CPP_DST="$(pip show unsloth-zoo | grep -i '^Location:' | awk '{print $2}')/unsloth_zoo/llama_cpp.py"
+    curl -sSL "https://raw.githubusercontent.com/unslothai/unsloth-zoo/refs/heads/main/unsloth_zoo/llama_cpp.py" \
+        -o "$LLAMA_CPP_DST"
+    # Patch: override vision.py with fix from unsloth PR: https://github.com/unslothai/unsloth/pull/4091 until next pypi release
+    VISION_DST="$(pip show unsloth | grep -i '^Location:' | awk '{print $2}')/unsloth/models/vision.py"
+    curl -sSL "https://raw.githubusercontent.com/unslothai/unsloth/80e0108a684c882965a02a8ed851e3473c1145ab/unsloth/models/vision.py" \
+        -o "$VISION_DST"
+    echo "   Installing studio dependencies..."
+    run_quiet "pip install studio" pip install --no-cache-dir -c "$SINGLE_ENV_CONSTRAINTS" -r "$REQ_ROOT/studio.txt"
+    echo "   Installing data-designer dependencies..."
+    run_quiet "pip install data-designer deps" pip install --no-cache-dir -c "$SINGLE_ENV_CONSTRAINTS" -r "$SINGLE_ENV_DATA_DESIGNER_DEPS"
+    echo "   Installing data-designer..."
+    run_quiet "pip install data-designer" pip install --no-cache-dir --no-deps -c "$SINGLE_ENV_CONSTRAINTS" -r "$SINGLE_ENV_DATA_DESIGNER"
+    echo "   Installing local data-designer unstructured plugin..."
+    run_quiet "pip install data-designer-unstructured-seed" pip install --no-cache-dir --no-deps -e "$LOCAL_DD_UNSTRUCTURED_PLUGIN"
+    run_quiet "patch single-env metadata" python "$SINGLE_ENV_PATCH"
+    run_quiet "pip check" pip check
+    echo "✅ Python dependencies installed"
 }
 
 if [ "$IS_COLAB" = true ]; then
