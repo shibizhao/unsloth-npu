@@ -477,6 +477,7 @@ class UnslothTrainer:
                 format_type=format_type,
                 dataset_name=dataset_source,
                 custom_format_mapping=custom_format_mapping,
+                progress_callback=self._update_progress,
             )
 
             # Check if stopped during formatting
