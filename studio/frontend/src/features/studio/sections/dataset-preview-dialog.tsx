@@ -30,6 +30,7 @@ type DatasetPreviewDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   datasetName: string | null;
+  datasetSource?: "huggingface" | "upload";
   hfToken: string | null;
   datasetSubset?: string | null;
   datasetSplit?: string | null;
@@ -42,6 +43,7 @@ export function DatasetPreviewDialog({
   open,
   onOpenChange,
   datasetName,
+  datasetSource,
   hfToken,
   datasetSubset,
   datasetSplit,
@@ -70,9 +72,9 @@ export function DatasetPreviewDialog({
   const hasHeuristicMapping = !data?.requires_manual_mapping && !!data?.suggested_mapping;
   const mappingEnabled = !!data?.requires_manual_mapping || hasHeuristicMapping;
   const showMappingFooter = mode === "mapping" && mappingEnabled;
-  const mappingOk = isMappingComplete(manualMapping, effectiveIsVlm, datasetFormat, effectiveIsAudio);
-  const availableRoles = getAvailableRoles(effectiveIsVlm, datasetFormat, effectiveIsAudio);
-  const isHfDataset = !!datasetName && datasetName.includes("/");
+  const mappingOk = isMappingComplete(manualMapping, effectiveIsVlm, datasetFormat);
+  const availableRoles = getAvailableRoles(effectiveIsVlm, datasetFormat);
+  const isHfDataset = datasetSource === "huggingface";
 
   // When format changes, remap existing mapping roles to the new format's role names
   const prevFormatRef = useRef(datasetFormat);
@@ -162,7 +164,7 @@ export function DatasetPreviewDialog({
   // Determine source label
   const sourceLabel = useMemo(() => {
     if (!datasetName) return "";
-    if (datasetName.includes("/")) {
+    if (datasetSource === "huggingface") {
       let label = `Hugging Face (${datasetName}`;
       if (datasetSubset) label += ` / ${datasetSubset}`;
       if (datasetSplit) label += ` / ${datasetSplit}`;
@@ -170,7 +172,7 @@ export function DatasetPreviewDialog({
       return label;
     }
     return `Local Files (${datasetName})`;
-  }, [datasetName, datasetSubset, datasetSplit]);
+  }, [datasetName, datasetSource, datasetSubset, datasetSplit]);
 
   // Build TanStack Table columns from the column names
   const tableColumns = useMemo<ColumnDef<Record<string, unknown>>[]>(() => {
