@@ -180,40 +180,23 @@ else
     # Local: create venv (always start fresh to preserve correct install order)
     rm -rf .venv
     rm -rf .venv_overlay  # Clean up stale transformers version overlay
+    rm -rf .venv_t5       # Will be rebuilt below
     "$BEST_PY" -m venv .venv
     source .venv/bin/activate
-    run_quiet "pip upgrade" pip install --upgrade pip
-    echo "   Installing unsloth-zoo + unsloth..."
-    run_quiet "pip install unsloth" pip install -r "$SCRIPT_DIR/studio/backend/requirements/base.txt"
-    echo "   Installing additional unsloth dependencies..."
-    run_quiet "pip install extras" pip install --no-cache-dir -r "$SCRIPT_DIR/studio/backend/requirements/extras.txt"
-    run_quiet "pip install extras" pip install --no-deps --no-cache-dir -r "$SCRIPT_DIR/studio/backend/requirements/extras-no-deps.txt"
-    run_quiet "pip install torchao+transformers" pip install --force-reinstall --no-cache-dir -r "$SCRIPT_DIR/studio/backend/requirements/overrides.txt"
-    run_quiet "pip install triton_kernels" pip install --no-deps -r "$SCRIPT_DIR/studio/backend/requirements/triton-kernels.txt"
-    # Patch: override llama_cpp.py with fix from unsloth-zoo branch
-    LLAMA_CPP_DST="$(pip show unsloth-zoo | grep -i '^Location:' | awk '{print $2}')/unsloth_zoo/llama_cpp.py"
-    curl -sSL "https://raw.githubusercontent.com/unslothai/unsloth-zoo/refs/heads/main/unsloth_zoo/llama_cpp.py" \
-        -o "$LLAMA_CPP_DST"
-    # Patch: override vision.py with fix from unsloth PR: https://github.com/unslothai/unsloth/pull/4091 until next pypi release
-    VISION_DST="$(pip show unsloth | grep -i '^Location:' | awk '{print $2}')/unsloth/models/vision.py"
-    curl -sSL "https://raw.githubusercontent.com/unslothai/unsloth/80e0108a684c882965a02a8ed851e3473c1145ab/unsloth/models/vision.py" \
-        -o "$VISION_DST"
-    echo "   Installing studio dependencies..."
-    run_quiet "pip install studio" pip install --no-cache-dir -c "$SINGLE_ENV_CONSTRAINTS" -r "$REQ_ROOT/studio.txt"
-    echo "   Installing data-designer dependencies..."
-    run_quiet "pip install data-designer deps" pip install --no-cache-dir -c "$SINGLE_ENV_CONSTRAINTS" -r "$SINGLE_ENV_DATA_DESIGNER_DEPS"
-    echo "   Installing data-designer..."
-    run_quiet "pip install data-designer" pip install --no-cache-dir --no-deps -c "$SINGLE_ENV_CONSTRAINTS" -r "$SINGLE_ENV_DATA_DESIGNER"
-    # Colab's bundled IPython 7.34 requires jedi but doesn't ship it
-    run_quiet "pip install jedi" pip install --no-cache-dir jedi
-    run_quiet "patch single-env metadata" python "$SINGLE_ENV_PATCH"
-    # pip check can flag minor transitive-dependency version mismatches that
-    # don't actually break anything.  Warn instead of aborting.
-    if ! pip check > /dev/null 2>&1; then
-        echo "⚠️  pip check reports dependency conflicts (safe to ignore)"
-    fi
-    echo "✅ Python dependencies installed"
-    
+    install_python_stack
+
+    # ── 6b. Pre-install transformers 5.x into .venv_t5/ ──
+    # Models like GLM-4.7-Flash need transformers>=5.1.0. Instead of pip-installing
+    # at runtime (slow, ~10-15s), we pre-install into a separate directory.
+    # The training subprocess just prepends .venv_t5/ to sys.path — instant switch.
+    echo ""
+    echo "   Pre-installing transformers 5.x for newer model support..."
+    VENV_T5_DIR="$SCRIPT_DIR/.venv_t5"
+    mkdir -p "$VENV_T5_DIR"
+    run_quiet "pip install transformers 5.x" pip install --target "$VENV_T5_DIR" --no-deps "transformers==5.1.0"
+    run_quiet "pip install huggingface_hub for t5" pip install --target "$VENV_T5_DIR" --no-deps "huggingface_hub>=1.3.0"
+    echo "✅ Transformers 5.x pre-installed to .venv_t5/"
+
     # ── 7. WSL: pre-install GGUF build dependencies ──
     # On WSL, sudo requires a password and can't be entered during GGUF export
     # (runs in a non-interactive subprocess). Install build deps here instead.
