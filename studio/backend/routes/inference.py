@@ -86,6 +86,9 @@ async def load_model(
     GGUF models are loaded via llama-server (llama.cpp) instead of Unsloth.
     """
     try:
+        # Version switching is handled automatically by the subprocess-based
+        # inference backend — no need for ensure_transformers_version() here.
+
         # Create config using clean factory method
         # is_lora is auto-detected from adapter_config.json on disk/HF
         config = ModelConfig.from_identifier(
