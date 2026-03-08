@@ -258,6 +258,21 @@ export function useChatModelRuntime() {
             }
             throw error;
           }
+
+          const currentParams = useChatRuntimeStore.getState().params;
+          const loadResponse = await loadModel({
+            model_path: modelId,
+            hf_token: null,
+            max_seq_length: DEFAULT_MODEL_MAX_SEQ_LENGTH,
+            load_in_4bit: true,
+            is_lora: isLora,
+            gguf_variant: ggufVariant ?? null,
+            trust_remote_code: currentParams.trustRemoteCode ?? false,
+          });
+
+          const paramsAfterLoad = useChatRuntimeStore.getState().params;
+          setParams(mergeRecommendedInference(paramsAfterLoad, loadResponse, modelId));
+          await refresh();
         }
 
         let description = "Base model selected.";
