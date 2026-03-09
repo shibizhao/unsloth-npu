@@ -40,12 +40,6 @@ class CheckFormatResponse(BaseModel):
     total_rows: Optional[int] = None
 
 
-class UploadDatasetRequest(BaseModel):
-    """Request for uploading a local training dataset file."""
-    filename: str = Field(..., description="Original filename, e.g. my_data.jsonl")
-    content_base64: str = Field(..., description="Base64-encoded file bytes")
-
-
 class UploadDatasetResponse(BaseModel):
     """Response with stored dataset path for training."""
     filename: str = Field(..., description="Original filename")
