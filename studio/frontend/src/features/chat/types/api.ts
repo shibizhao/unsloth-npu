@@ -76,6 +76,7 @@ export interface LoadModelResponse {
     top_p?: number;
     top_k?: number;
     min_p?: number;
+    trust_remote_code?: boolean;
   };
 }
 
