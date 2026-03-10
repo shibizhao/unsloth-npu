@@ -163,6 +163,7 @@ export const useTrainingConfigStore = create<TrainingConfigStore>()(
 
             set({
               isLoadingModelDefaults: false,
+              isAudioModel: false,
               modelDefaultsError:
                 error instanceof Error
                   ? error.message
@@ -176,12 +177,13 @@ export const useTrainingConfigStore = create<TrainingConfigStore>()(
                 set({
                   modelType: isVision ? "vision" : "text",
                   isVisionModel: isVision,
+                  isAudioModel: false,
                   isCheckingVision: false,
                 });
               })
               .catch(() => {
                 if (get().selectedModel !== modelName) return;
-                set({ isCheckingVision: false });
+                set({ isCheckingVision: false, isAudioModel: false });
               });
           });
       };
