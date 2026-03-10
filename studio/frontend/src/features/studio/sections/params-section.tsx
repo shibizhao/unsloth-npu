@@ -782,7 +782,7 @@ export function ParamsSection(): ReactElement {
                       </SelectContent>
                     </Select>
                   </Row>
-                  {!showVisionLora && (
+                  {!showVisionLora && !store.isEmbeddingModel && (
                     <div className="flex items-center gap-2">
                       <Checkbox
                         id="packing"
@@ -797,19 +797,21 @@ export function ParamsSection(): ReactElement {
                       </label>
                     </div>
                   )}
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="trainOnCompletions"
-                      checked={store.trainOnCompletions}
-                      onCheckedChange={(v) => store.setTrainOnCompletions(!!v)}
-                    />
-                    <label
-                      htmlFor="trainOnCompletions"
-                      className="text-xs cursor-pointer text-muted-foreground"
-                    >
-                      Assistant completions only
-                    </label>
-                  </div>
+                  {!store.isEmbeddingModel && (
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="trainOnCompletions"
+                        checked={store.trainOnCompletions}
+                        onCheckedChange={(v) => store.setTrainOnCompletions(!!v)}
+                      />
+                      <label
+                        htmlFor="trainOnCompletions"
+                        className="text-xs cursor-pointer text-muted-foreground"
+                      >
+                        Assistant completions only
+                      </label>
+                    </div>
+                  )}
                 </TabsContent>
               </Tabs>
             </CollapsibleContent>
