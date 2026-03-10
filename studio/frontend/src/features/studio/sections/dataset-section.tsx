@@ -103,8 +103,6 @@ export function DatasetSection() {
     uploadedFile,
     hfToken,
     modelType,
-    isVisionModel,
-    isCheckingVision,
     datasetSliceStart,
     setDatasetSliceStart,
     datasetSliceEnd,
@@ -126,8 +124,6 @@ export function DatasetSection() {
       uploadedFile: s.uploadedFile,
       hfToken: s.hfToken,
       modelType: s.modelType,
-      isVisionModel: s.isVisionModel,
-      isCheckingVision: s.isCheckingVision,
       datasetSliceStart: s.datasetSliceStart,
       setDatasetSliceStart: s.setDatasetSliceStart,
       datasetSliceEnd: s.datasetSliceEnd,
@@ -227,7 +223,7 @@ export function DatasetSection() {
     setSearchQuery(val);
   }
 
-  const effectiveModelType = !isCheckingVision && isVisionModel ? "vision" : modelType;
+  const effectiveModelType = modelType ?? "text";
 
   const {
     results: hfResults,
