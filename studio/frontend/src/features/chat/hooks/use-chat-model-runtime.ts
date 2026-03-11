@@ -16,8 +16,6 @@ import type {
   InferenceParams,
 } from "../types/runtime";
 
-const DEFAULT_MODEL_MAX_SEQ_LENGTH = 2048;
-
 type SelectedModelInput = {
   id: string;
   isLora?: boolean;
@@ -212,13 +210,15 @@ export function useChatModelRuntime() {
           let previousWasUnloaded = false;
           const currentCheckpoint =
             useChatRuntimeStore.getState().params.checkpoint;
+          const paramsBeforeLoad = useChatRuntimeStore.getState().params;
+          const maxSeqLength = paramsBeforeLoad.maxSeqLength;
           try {
             // Lightweight pre-flight validation: avoid unloading a working model
             // if the new identifier is clearly invalid (e.g. bad HF id / path).
             await validateModel({
               model_path: modelId,
               hf_token: null,
-              max_seq_length: DEFAULT_MODEL_MAX_SEQ_LENGTH,
+              max_seq_length: maxSeqLength,
               load_in_4bit: true,
               is_lora: isLora,
               gguf_variant: ggufVariant ?? null,
@@ -232,7 +232,7 @@ export function useChatModelRuntime() {
             const loadResponse = await loadModel({
               model_path: modelId,
               hf_token: null,
-              max_seq_length: DEFAULT_MODEL_MAX_SEQ_LENGTH,
+              max_seq_length: maxSeqLength,
               load_in_4bit: true,
               is_lora: isLora,
               gguf_variant: ggufVariant ?? null,
@@ -250,7 +250,7 @@ export function useChatModelRuntime() {
                 await loadModel({
                   model_path: previousCheckpoint,
                   hf_token: null,
-                  max_seq_length: DEFAULT_MODEL_MAX_SEQ_LENGTH,
+                  max_seq_length: maxSeqLength,
                   load_in_4bit: true,
                   is_lora: previousIsLora,
                   gguf_variant: previousVariant,
