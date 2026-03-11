@@ -6,7 +6,8 @@ through its OpenAI-compatible /v1/chat/completions endpoint.
 """
 import atexit
 import json
-import logging
+import structlog
+from loggers import get_logger
 import shutil
 import signal
 import socket
@@ -18,7 +19,7 @@ from typing import Generator, Optional
 
 import httpx
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class LlamaCppBackend:

@@ -5,7 +5,8 @@ import sys
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional
-import logging
+import structlog
+from loggers import get_logger
 
 # Add backend directory to path
 backend_path = Path(__file__).parent.parent.parent
@@ -63,7 +64,7 @@ from models.models import GgufVariantDetail, GgufVariantsResponse, ModelType
 from models.responses import LoRABaseModelResponse, VisionCheckResponse, EmbeddingCheckResponse
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def derive_model_type(is_vision: bool, audio_type: Optional[str], is_embedding: bool = False) -> ModelType:
@@ -76,14 +77,7 @@ def derive_model_type(is_vision: bool, audio_type: Optional[str], is_embedding: 
         return "vision"
     return "text"
 
-# Configure logger
-if not logger.handlers:
-    handler = logging.StreamHandler()
-    handler.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
+
 
 
 def _resolve_hf_cache_dir() -> Path:

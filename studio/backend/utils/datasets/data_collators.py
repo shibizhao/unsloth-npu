@@ -8,6 +8,10 @@ particularly for VLM/OCR processing.
 import torch
 from dataclasses import dataclass
 from typing import Any, List, Optional, Union
+from loggers import get_logger
+logger = get_logger(__name__)
+
+
 
 
 @dataclass
@@ -113,7 +117,7 @@ class DeepSeekOCRDataCollator:
             return inputs
 
         except Exception as e:
-            print(f"⚠️ DeepSeekOCRDataCollator error: {e}")
+            logger.info(f"⚠️ DeepSeekOCRDataCollator error: {e}")
             raise
 
 
