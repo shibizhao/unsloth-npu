@@ -66,6 +66,8 @@ export function DatasetPreviewDialog({
     manualMapping, setManualMapping, datasetFormat,
     setDatasetAdvisorFields, datasetAdvisorNotification,
     datasetSystemPrompt,
+    selectedModel,
+    modelType,
   } = useTrainingConfigStore(
     useShallow((s) => ({
       manualMapping: s.datasetManualMapping,
@@ -74,6 +76,8 @@ export function DatasetPreviewDialog({
       setDatasetAdvisorFields: s.setDatasetAdvisorFields,
       datasetAdvisorNotification: s.datasetAdvisorNotification,
       datasetSystemPrompt: s.datasetSystemPrompt,
+      selectedModel: s.selectedModel,
+      modelType: s.modelType,
     })),
   );
   const { isStarting, startError, startTrainingRun } = useTrainingActions();
@@ -105,6 +109,8 @@ export function DatasetPreviewDialog({
         samples: data.preview_samples,
         datasetName: datasetName,
         hfToken: hfToken,
+        modelName: selectedModel,
+        modelType: modelType,
       });
 
       if (result.success && result.suggested_mapping) {
@@ -132,7 +138,7 @@ export function DatasetPreviewDialog({
     } finally {
       setIsAiLoading(false);
     }
-  }, [data, datasetFormat, datasetName, hfToken, setManualMapping, setDatasetAdvisorFields]);
+  }, [data, datasetFormat, datasetName, hfToken, setManualMapping, setDatasetAdvisorFields, selectedModel, modelType]);
 
   // When format changes, remap existing mapping roles to the new format's role names
   const prevFormatRef = useRef(datasetFormat);

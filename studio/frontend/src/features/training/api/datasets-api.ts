@@ -65,6 +65,8 @@ type AiAssistMappingArgs = {
   samples: Record<string, unknown>[];
   datasetName?: string | null;
   hfToken?: string | null;
+  modelName?: string | null;
+  modelType?: "text" | "vision" | "audio" | "embeddings" | null;
 };
 
 export type AiAssistMappingResponse = {
@@ -84,6 +86,8 @@ export async function aiAssistMapping({
   samples,
   datasetName,
   hfToken,
+  modelName,
+  modelType,
 }: AiAssistMappingArgs): Promise<AiAssistMappingResponse> {
   const res = await authFetch("/api/datasets/ai-assist-mapping", {
     method: "POST",
@@ -93,6 +97,8 @@ export async function aiAssistMapping({
       samples: samples.slice(0, 5),
       dataset_name: datasetName || undefined,
       hf_token: hfToken || undefined,
+      model_name: modelName || undefined,
+      model_type: modelType || undefined,
     }),
   });
 
