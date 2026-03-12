@@ -12,6 +12,7 @@ worker's mp.Queue, and exposes the same API surface to routes/training.py.
 
 Pattern follows core/data_recipe/jobs/manager.py.
 """
+
 import math
 import multiprocessing as mp
 import queue
@@ -38,6 +39,7 @@ PLOT_HEIGHT = 3.5
 class TrainingProgress:
     """Mirror of trainer.TrainingProgress — kept here so the parent process
     never needs to import the heavy ML modules."""
+
     epoch: float = 0
     step: int = 0
     total_steps: int = 0
@@ -108,7 +110,7 @@ class TrainingBackend:
         # Join prior pump thread to prevent it from consuming events
         # from the new job's queue (it reads self._event_queue dynamically).
         if self._pump_thread is not None and self._pump_thread.is_alive():
-            self._pump_thread.join(timeout=5.0)
+            self._pump_thread.join(timeout = 5.0)
             if self._pump_thread.is_alive():
                 logger.warning("Previous pump thread did not exit within 5s")
         self._pump_thread = None
@@ -116,7 +118,9 @@ class TrainingBackend:
         # Reset state
         self._should_stop = False
         self._cancel_requested = False
-        self._progress = TrainingProgress(is_training=True, status_message="Initializing training...")
+        self._progress = TrainingProgress(
+            is_training = True, status_message = "Initializing training..."
+        )
         self.loss_history.clear()
         self.lr_history.clear()
         self.step_history.clear()
@@ -171,7 +175,9 @@ class TrainingBackend:
             "train_on_completions": kwargs.get("train_on_completions", False),
             "finetune_vision_layers": kwargs.get("finetune_vision_layers", True),
             "finetune_language_layers": kwargs.get("finetune_language_layers", True),
-            "finetune_attention_modules": kwargs.get("finetune_attention_modules", True),
+            "finetune_attention_modules": kwargs.get(
+                "finetune_attention_modules", True
+            ),
             "finetune_mlp_modules": kwargs.get("finetune_mlp_modules", True),
             "enable_wandb": kwargs.get("enable_wandb", False),
             "wandb_token": kwargs.get("wandb_token"),
@@ -192,19 +198,19 @@ class TrainingBackend:
         self._stop_queue = _CTX.Queue()
 
         self._proc = _CTX.Process(
-            target=run_training_process,
-            kwargs={
+            target = run_training_process,
+            kwargs = {
                 "event_queue": self._event_queue,
                 "stop_queue": self._stop_queue,
                 "config": config,
             },
-            daemon=True,
+            daemon = True,
         )
         self._proc.start()
         logger.info("Training subprocess started (pid=%s)", self._proc.pid)
 
         # Start event pump thread
-        self._pump_thread = threading.Thread(target=self._pump_loop, daemon=True)
+        self._pump_thread = threading.Thread(target = self._pump_loop, daemon = True)
         self._pump_thread.start()
 
                        # NEW: Vision-specific LoRA parameters
@@ -422,7 +428,8 @@ class TrainingBackend:
             # Update progress immediately for responsive UI
             self._progress.status_message = (
                 "Stopping training and saving checkpoint..."
-                if save else "Cancelling training..."
+                if save
+                else "Cancelling training..."
             )
         return True
 
@@ -430,15 +437,17 @@ class TrainingBackend:
         """Force-kill the training subprocess so state can be reset immediately."""
         with self._lock:
             if self._proc is not None and self._proc.is_alive():
-                logger.info("Force-terminating training subprocess (pid=%s)", self._proc.pid)
+                logger.info(
+                    "Force-terminating training subprocess (pid=%s)", self._proc.pid
+                )
                 self._proc.terminate()
             proc = self._proc
 
         if proc is not None:
-            proc.join(timeout=5.0)
+            proc.join(timeout = 5.0)
             if proc.is_alive():
                 proc.kill()
-                proc.join(timeout=2.0)
+                proc.join(timeout = 2.0)
 
     def is_training_active(self) -> bool:
         """Check if training is currently active."""
@@ -460,9 +469,29 @@ class TrainingBackend:
 
             # Check status message for activity indicators
             status_lower = (p.status_message or "").lower()
-            if any(k in status_lower for k in ["cancelled", "canceled", "stopped", "completed", "ready to train"]):
+            if any(
+                k in status_lower
+                for k in [
+                    "cancelled",
+                    "canceled",
+                    "stopped",
+                    "completed",
+                    "ready to train",
+                ]
+            ):
                 return False
-            if any(k in status_lower for k in ["loading", "preparing", "training", "configuring", "tokenizing", "starting", "importing"]):
+            if any(
+                k in status_lower
+                for k in [
+                    "loading",
+                    "preparing",
+                    "training",
+                    "configuring",
+                    "tokenizing",
+                    "starting",
+                    "importing",
+                ]
+            ):
                 return True
 
             return False
@@ -480,7 +509,7 @@ class TrainingBackend:
 
     def refresh_plot_for_theme(self, theme: str) -> Optional[plt.Figure]:
         """Refresh plot with new theme."""
-        if theme and isinstance(theme, str) and theme in ['light', 'dark']:
+        if theme and isinstance(theme, str) and theme in ["light", "dark"]:
             self.current_theme = theme
         if self.loss_history:
             with self._lock:
@@ -494,6 +523,7 @@ class TrainingBackend:
 
     class _TrainerShim:
         """Minimal shim so routes that access backend.trainer.* still work."""
+
         def __init__(self, backend: "TrainingBackend"):
             self._backend = backend
             self.should_stop = False
@@ -531,7 +561,7 @@ class TrainingBackend:
                 return
 
             # Try to read an event
-            event = self._read_queue(self._event_queue, timeout_sec=0.25)
+            event = self._read_queue(self._event_queue, timeout_sec = 0.25)
             if event is not None:
                 self._handle_event(event)
                 continue
@@ -552,7 +582,10 @@ class TrainingBackend:
                         self._progress.status_message = "Training stopped."
                     else:
                         self._progress.is_training = False
-                        self._progress.error = self._progress.error or "Training process exited unexpectedly"
+                        self._progress.error = (
+                            self._progress.error
+                            or "Training process exited unexpectedly"
+                        )
             return
 
     def _handle_event(self, event: dict) -> None:
@@ -564,8 +597,12 @@ class TrainingBackend:
                 self._progress.step = event.get("step", self._progress.step)
                 self._progress.epoch = event.get("epoch", self._progress.epoch)
                 self._progress.loss = event.get("loss", self._progress.loss)
-                self._progress.learning_rate = event.get("learning_rate", self._progress.learning_rate)
-                self._progress.total_steps = event.get("total_steps", self._progress.total_steps)
+                self._progress.learning_rate = event.get(
+                    "learning_rate", self._progress.learning_rate
+                )
+                self._progress.total_steps = event.get(
+                    "total_steps", self._progress.total_steps
+                )
                 self._progress.elapsed_seconds = event.get("elapsed_seconds")
                 self._progress.eta_seconds = event.get("eta_seconds")
                 self._progress.grad_norm = event.get("grad_norm")
@@ -626,7 +663,7 @@ class TrainingBackend:
     @staticmethod
     def _read_queue(q: Any, timeout_sec: float) -> Optional[dict]:
         try:
-            return q.get(timeout=timeout_sec)
+            return q.get(timeout = timeout_sec)
         except queue.Empty:
             return None
         except (EOFError, OSError, ValueError):
@@ -647,28 +684,30 @@ class TrainingBackend:
     # Plot generation (unchanged from original)
     # ------------------------------------------------------------------
 
-    def _create_loss_plot(self, progress: TrainingProgress, theme: str = "light") -> plt.Figure:
+    def _create_loss_plot(
+        self, progress: TrainingProgress, theme: str = "light"
+    ) -> plt.Figure:
         """Create training loss plot with theme-aware styling."""
-        plt.close('all')
+        plt.close("all")
 
         LIGHT_STYLE = {
             "facecolor": "#ffffff",
             "grid_color": "#d1d5db",
             "line": "#16b88a",
             "text": "#1f2937",
-            "empty_text": "#6b7280"
+            "empty_text": "#6b7280",
         }
         DARK_STYLE = {
             "facecolor": "#292929",
             "grid_color": "#404040",
             "line": "#4ade80",
             "text": "#e5e7eb",
-            "empty_text": "#9ca3af"
+            "empty_text": "#9ca3af",
         }
 
         style = LIGHT_STYLE if theme == "light" else DARK_STYLE
 
-        fig, ax = plt.subplots(figsize=(PLOT_WIDTH, PLOT_HEIGHT))
+        fig, ax = plt.subplots(figsize = (PLOT_WIDTH, PLOT_HEIGHT))
         fig.patch.set_facecolor(style["facecolor"])
         ax.set_facecolor(style["facecolor"])
 
@@ -676,8 +715,15 @@ class TrainingBackend:
             steps = self.step_history
             losses = self.loss_history
             scatter_color = "#60a5fa"
-            ax.scatter(steps, losses, s=16, alpha=0.6, color=scatter_color,
-                      linewidths=0, label="Training Loss (raw)")
+            ax.scatter(
+                steps,
+                losses,
+                s = 16,
+                alpha = 0.6,
+                color = scatter_color,
+                linewidths = 0,
+                label = "Training Loss (raw)",
+            )
 
             MA_WINDOW = 20
             window = min(MA_WINDOW, len(losses))
@@ -693,15 +739,21 @@ class TrainingBackend:
                     denom = i - start + 1
                     ma.append((cumsum[i + 1] - cumsum[start]) / denom)
 
-                ax.plot(steps, ma, color=style["line"], linewidth=2.5, alpha=0.95,
-                       label=f"Moving Avg ({ma[-1]:.4f})")
+                ax.plot(
+                    steps,
+                    ma,
+                    color = style["line"],
+                    linewidth = 2.5,
+                    alpha = 0.95,
+                    label = f"Moving Avg ({ma[-1]:.4f})",
+                )
 
-                leg = ax.legend(frameon=False, fontsize=9)
+                leg = ax.legend(frameon = False, fontsize = 9)
                 for t in leg.get_texts():
                     t.set_color(style["text"])
 
-            ax.set_xlabel('Steps', fontsize=10, color=style["text"])
-            ax.set_ylabel('Loss', fontsize=10, color=style["text"])
+            ax.set_xlabel("Steps", fontsize = 10, color = style["text"])
+            ax.set_ylabel("Loss", fontsize = 10, color = style["text"])
 
             if progress.error:
                 title = f"Error: {progress.error}"
@@ -714,17 +766,31 @@ class TrainingBackend:
             else:
                 title = "Training Loss"
 
-            ax.set_title(title, fontsize=11, fontweight='bold', pad=10, color=style["text"])
-            ax.grid(True, alpha=0.4, linestyle='--', color=style["grid_color"])
-            ax.tick_params(colors=style["text"], which='both')
-            ax.spines['top'].set_visible(False)
-            ax.spines['right'].set_visible(False)
-            ax.spines['bottom'].set_color(style["text"])
-            ax.spines['left'].set_color(style["text"])
+            ax.set_title(
+                title, fontsize = 11, fontweight = "bold", pad = 10, color = style["text"]
+            )
+            ax.grid(True, alpha = 0.4, linestyle = "--", color = style["grid_color"])
+            ax.tick_params(colors = style["text"], which = "both")
+            ax.spines["top"].set_visible(False)
+            ax.spines["right"].set_visible(False)
+            ax.spines["bottom"].set_color(style["text"])
+            ax.spines["left"].set_color(style["text"])
         else:
-            display_msg = progress.status_message if progress.status_message else 'Waiting for training data...'
-            ax.text(0.5, 0.5, display_msg, ha='center', va='center', fontsize=16,
-                   color=style["empty_text"], transform=ax.transAxes)
+            display_msg = (
+                progress.status_message
+                if progress.status_message
+                else "Waiting for training data..."
+            )
+            ax.text(
+                0.5,
+                0.5,
+                display_msg,
+                ha = "center",
+                va = "center",
+                fontsize = 16,
+                color = style["empty_text"],
+                transform = ax.transAxes,
+            )
             ax.set_xticks([])
             ax.set_yticks([])
             for spine in ax.spines.values():
@@ -742,7 +808,8 @@ class TrainingBackend:
         """
         logger.info(
             "_transfer_to_inference_backend: subprocess training — "
-            "model must be loaded from disk (output_dir=%s)", self._output_dir
+            "model must be loaded from disk (output_dir=%s)",
+            self._output_dir,
         )
         return False
 

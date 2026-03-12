@@ -60,7 +60,7 @@ def get_tokenizer_chat_template(tokenizer, model_name):
         try:
             tokenizer = get_chat_template(
                 tokenizer,
-                chat_template=matched_template,
+                chat_template = matched_template,
             )
         except Exception as e:
             logger.info(f"⚠️ Failed to apply Unsloth template '{matched_template}': {e}")
@@ -79,7 +79,7 @@ def get_tokenizer_chat_template(tokenizer, model_name):
             try:
                 tokenizer = get_chat_template(
                     tokenizer,
-                    chat_template="chatml",
+                    chat_template = "chatml",
                 )
             except Exception as e:
                 logger.info(f"⚠️ Failed to apply default ChatML template: {e}")
@@ -118,14 +118,14 @@ def get_dataset_info_summary(dataset_info):
 def apply_chat_template_to_dataset(
     dataset_info,
     tokenizer,
-    model_name=None,
-    custom_prompt_template=None,
-    add_eos_token=False,
-    remove_bos_prefix=False,
-    custom_format_mapping=None,
-    auto_detect_mapping=True,
-    batch_size=1000,
-    num_proc=None,
+    model_name = None,
+    custom_prompt_template = None,
+    add_eos_token = False,
+    remove_bos_prefix = False,
+    custom_format_mapping = None,
+    auto_detect_mapping = True,
+    batch_size = 1000,
+    num_proc = None,
 ):
     """
     Applies chat template to dataset based on its format.
@@ -232,7 +232,7 @@ def apply_chat_template_to_dataset(
                 return result
 
             try:
-                dataset = dataset.map(_apply_custom_mapping, batched=True, batch_size=batch_size)
+                dataset = dataset.map(_apply_custom_mapping, batched = True, batch_size = batch_size)
                 # Update to use conversations format
                 final_format = "chatml_conversations"
                 chat_column = "conversations"
@@ -255,7 +255,7 @@ def apply_chat_template_to_dataset(
         if not (hasattr(tokenizer, 'chat_template') and tokenizer.chat_template):
             try:
                 from unsloth.chat_templates import get_chat_template
-                tokenizer = get_chat_template(tokenizer, chat_template="alpaca")
+                tokenizer = get_chat_template(tokenizer, chat_template = "alpaca")
                 logger.info(f"📝 Set alpaca chat template on tokenizer for model saving")
             except Exception as e:
                 logger.info(f"⚠️ Could not set alpaca template on tokenizer: {e}")
@@ -332,8 +332,8 @@ def apply_chat_template_to_dataset(
                 try:
                     text = tokenizer.apply_chat_template(
                         convo,
-                        tokenize=False,
-                        add_generation_prompt=False
+                        tokenize = False,
+                        add_generation_prompt = False
                     )
 
                     if remove_bos_prefix:

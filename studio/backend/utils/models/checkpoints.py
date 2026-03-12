@@ -3,6 +3,7 @@
 """
 Checkpoint scanning utilities for discovering training runs and their checkpoints.
 """
+
 import json
 import structlog
 from loggers import get_logger
@@ -85,7 +86,9 @@ def scan_checkpoints(
                     name_part = parts[0]
                     idx = name_part.find("_")
                     if idx > 0:
-                        metadata["base_model"] = name_part[:idx] + "/" + name_part[idx + 1:]
+                        metadata["base_model"] = (
+                            name_part[:idx] + "/" + name_part[idx + 1 :]
+                        )
                     else:
                         metadata["base_model"] = name_part
 
@@ -108,13 +111,19 @@ def scan_checkpoints(
             # Assign the last checkpoint's loss to the main adapter entry
             if len(checkpoints) > 1:
                 last_checkpoint_loss = checkpoints[-1][2]
-                checkpoints[0] = (checkpoints[0][0], checkpoints[0][1], last_checkpoint_loss)
+                checkpoints[0] = (
+                    checkpoints[0][0],
+                    checkpoints[0][1],
+                    last_checkpoint_loss,
+                )
 
             models.append((item.name, checkpoints, metadata))
-            logger.debug(f"Found model: {item.name} with {len(checkpoints)} checkpoint(s)")
+            logger.debug(
+                f"Found model: {item.name} with {len(checkpoints)} checkpoint(s)"
+            )
 
         # Sort by modification time (newest first)
-        models.sort(key=lambda x: Path(x[1][0][1]).stat().st_mtime, reverse=True)
+        models.sort(key = lambda x: Path(x[1][0][1]).stat().st_mtime, reverse = True)
 
         logger.info(f"Found {len(models)} training runs in {outputs_dir}")
         return models
