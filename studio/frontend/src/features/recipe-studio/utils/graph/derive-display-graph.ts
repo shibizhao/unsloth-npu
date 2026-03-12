@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright 2026-present the Unsloth AI Inc. team. All rights reserved. See /studio/LICENSE.AGPL-3.0
+
 import type { Edge, Node, XYPosition } from "@xyflow/react";
 import type { RecipeGraphAuxNodeData } from "../../components/recipe-graph-aux-node";
 import { DEFAULT_NODE_HEIGHT, DEFAULT_NODE_WIDTH } from "../../constants";

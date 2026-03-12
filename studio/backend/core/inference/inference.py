@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright 2026-present the Unsloth AI Inc. team. All rights reserved. See /studio/LICENSE.AGPL-3.0
 """
 Core inference backend - streamlined
 """
@@ -1551,17 +1553,10 @@ class InferenceBackend:
         return next(iter(self.loading_models)) if self.loading_models else None
 
     def load_model_simple(self,
-<<<<<<< HEAD
-                     model_path: str,
-                     hf_token: Optional[str] = None,
-                     max_seq_length: int = 2048,
-                     load_in_4bit: bool = True) -> bool:
-=======
                          model_path: str,
                          hf_token: Optional[str] = None,
                          max_seq_length: int = 2048,
                          load_in_4bit: bool = True) -> bool:
->>>>>>> c636fd5a (code cleanup)
         """
         Simple model loading wrapper for chat interface.
         Accepts model path as string and handles ModelConfig creation internally.
@@ -1576,13 +1571,6 @@ class InferenceBackend:
             bool: True if successful, False otherwise
         """
         try:
-<<<<<<< HEAD
-            from backend.model_config import ModelConfig
-
-            logger.info(f"load_model_simple called with: {model_path}")
-
-=======
->>>>>>> c636fd5a (code cleanup)
             # Create config from string path
             config = ModelConfig.from_ui_selection(
                 model_path,
@@ -1590,11 +1578,6 @@ class InferenceBackend:
                 is_lora=False
             )
 
-<<<<<<< HEAD
-            logger.info(f"Created ModelConfig with identifier: {config.identifier}")
-
-=======
->>>>>>> c636fd5a (code cleanup)
             # Call existing load_model with config
             return self.load_model(
                 config=config,
@@ -1606,17 +1589,8 @@ class InferenceBackend:
 
         except Exception as e:
             logger.error(f"Error in load_model_simple: {e}")
-<<<<<<< HEAD
-            import traceback
-            traceback.print_exc()
             return False
 
-pass
-
-=======
-            return False
-
->>>>>>> c636fd5a (code cleanup)
 
 # Global inference backend instance
 inference_backend = InferenceBackend()
