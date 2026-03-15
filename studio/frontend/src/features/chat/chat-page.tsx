@@ -320,7 +320,8 @@ export function ChatPage(): ReactElement {
   const modelsFromStore = useChatRuntimeStore((state) => state.models);
   const lorasFromStore = useChatRuntimeStore((state) => state.loras);
   const modelsError = useChatRuntimeStore((state) => state.modelsError);
-  const { refresh, selectModel, ejectModel } = useChatModelRuntime();
+  const { refresh, selectModel, ejectModel, cancelLoading, loadingModel } =
+    useChatModelRuntime();
   const refreshRef = useRef(refresh);
   const selectModelRef = useRef(selectModel);
 
@@ -604,6 +605,13 @@ export function ChatPage(): ReactElement {
                   <span className="text-xs">
                     Downloading model…
                   </span>
+                  <button
+                    type="button"
+                    onClick={cancelLoading}
+                    className="ml-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                  >
+                    Cancel
+                  </button>
                 </div>
               ) : null}
             </div>
