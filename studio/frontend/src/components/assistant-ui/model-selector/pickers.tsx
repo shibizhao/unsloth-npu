@@ -152,26 +152,6 @@ function GgufVariantExpander({
     [repoId, onSelect],
   );
 
-  if (loading) {
-    return (
-      <div className="flex items-center gap-2 px-5 py-2">
-        <Spinner className="size-3 text-muted-foreground" />
-        <span className="text-xs text-muted-foreground">Loading variants…</span>
-      </div>
-    );
-  }
-
-  if (tooltipText) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>{content}</TooltipTrigger>
-        <TooltipContent side="left" className="max-w-xs break-all">
-          {tooltipText}
-        </TooltipContent>
-      </Tooltip>
-    );
-  }
-
   const sortedVariants = useMemo(() => {
     if (!variants) return variants;
     return [...variants].sort((a, b) => {
@@ -188,6 +168,21 @@ function GgufVariantExpander({
       return b.size_bytes - a.size_bytes;
     });
   }, [variants, defaultVariant, gpuGb]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 px-5 py-2">
+        <Spinner className="size-3 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground">Loading variants…</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="px-5 py-2 text-xs text-destructive">{error}</div>
+    );
+  }
 
   if (!sortedVariants || sortedVariants.length === 0) {
     return (
