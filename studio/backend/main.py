@@ -254,6 +254,22 @@ async def get_hardware_info():
 # ============ Serve Frontend (Optional) ============
 
 
+def _strip_crossorigin(html_bytes: bytes) -> bytes:
+    """Remove ``crossorigin`` attributes from script/link tags.
+
+    Vite adds ``crossorigin`` by default which forces CORS mode on font
+    subresource loads.  When Studio is served over plain HTTP, Firefox
+    HTTPS-Only Mode does not exempt CORS font requests -- causing all
+    @font-face downloads to fail silently.  Stripping the attribute
+    makes them regular same-origin fetches that work on any protocol.
+    """
+    import re as _re
+
+    html = html_bytes.decode("utf-8")
+    html = _re.sub(r'\s+crossorigin(?:="[^"]*")?', "", html)
+    return html.encode("utf-8")
+
+
 def _inject_bootstrap(html_bytes: bytes, app: FastAPI) -> bytes:
     """Inject bootstrap credentials into HTML when password change is required.
 
@@ -295,6 +311,7 @@ def setup_frontend(app: FastAPI, build_path: Path):
     @app.get("/")
     async def serve_root():
         content = (build_path / "index.html").read_bytes()
+        content = _strip_crossorigin(content)
         content = _inject_bootstrap(content, app)
         return Response(
             content = content,
@@ -318,6 +335,7 @@ def setup_frontend(app: FastAPI, build_path: Path):
 
         # Serve index.html as bytes — avoids Content-Length mismatch
         content = (build_path / "index.html").read_bytes()
+        content = _strip_crossorigin(content)
         content = _inject_bootstrap(content, app)
         return Response(
             content = content,
