@@ -627,7 +627,7 @@ class InferenceBackend:
         top_k: int = 40,
         min_p: float = 0.0,
         max_new_tokens: int = 256,
-        repetition_penalty: float = 1.1,
+        repetition_penalty: float = 1.0,
         cancel_event = None,
     ) -> Generator[str, None, None]:
         """
@@ -657,7 +657,7 @@ class InferenceBackend:
         top_k: int = 40,
         min_p: float = 0.0,
         max_new_tokens: int = 256,
-        repetition_penalty: float = 1.1,
+        repetition_penalty: float = 1.0,
         cancel_event = None,
         _adapter_state = None,
     ) -> Generator[str, None, None]:
@@ -1076,7 +1076,7 @@ class InferenceBackend:
         top_k: int = 40,
         min_p: float = 0.0,
         max_new_tokens: int = 256,
-        repetition_penalty: float = 1.1,
+        repetition_penalty: float = 1.0,
         cancel_event = None,
         _adapter_state = None,
     ) -> Generator[str, None, None]:
@@ -1210,7 +1210,7 @@ class InferenceBackend:
         top_k: int = 50,
         min_p: float = 0.0,
         max_new_tokens: int = 2048,
-        repetition_penalty: float = 1.1,
+        repetition_penalty: float = 1.0,
         use_adapter: Optional[Union[bool, str]] = None,
     ) -> Tuple[bytes, int]:
         """

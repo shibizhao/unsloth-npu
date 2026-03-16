@@ -394,7 +394,7 @@ class InferenceOrchestrator:
         top_k: int = 40,
         min_p: float = 0.0,
         max_new_tokens: int = 256,
-        repetition_penalty: float = 1.1,
+        repetition_penalty: float = 1.0,
         cancel_event = None,
         use_adapter = None,
     ) -> Generator[str, None, None]:
@@ -665,7 +665,7 @@ class InferenceOrchestrator:
         top_k: int = 40,
         min_p: float = 0.0,
         max_new_tokens: int = 256,
-        repetition_penalty: float = 1.1,
+        repetition_penalty: float = 1.0,
         cancel_event = None,
     ) -> Generator[str, None, None]:
         """Generate response, streaming tokens from subprocess."""
@@ -711,7 +711,7 @@ class InferenceOrchestrator:
         top_k: int = 40,
         min_p: float = 0.0,
         max_new_tokens: int = 256,
-        repetition_penalty: float = 1.1,
+        repetition_penalty: float = 1.0,
         cancel_event = None,
         use_adapter = None,
     ) -> Generator[str, None, None]:
@@ -762,7 +762,7 @@ class InferenceOrchestrator:
         top_k: int = 40,
         min_p: float = 0.0,
         max_new_tokens: int = 256,
-        repetition_penalty: float = 1.1,
+        repetition_penalty: float = 1.0,
         cancel_event = None,
         use_adapter = None,
     ) -> Generator[str, None, None]:
@@ -861,7 +861,7 @@ class InferenceOrchestrator:
         top_k: int = 50,
         min_p: float = 0.0,
         max_new_tokens: int = 2048,
-        repetition_penalty: float = 1.1,
+        repetition_penalty: float = 1.0,
         use_adapter: Optional[Union[bool, str]] = None,
     ) -> Tuple[bytes, int]:
         """Generate TTS audio. Returns (wav_bytes, sample_rate).
@@ -948,7 +948,7 @@ class InferenceOrchestrator:
         top_k: int = 40,
         min_p: float = 0.0,
         max_new_tokens: int = 512,
-        repetition_penalty: float = 1.1,
+        repetition_penalty: float = 1.0,
         cancel_event = None,
     ) -> Generator[str, None, None]:
         """Audio input generation (e.g. Gemma 3n) — streams text tokens."""
@@ -977,7 +977,7 @@ class InferenceOrchestrator:
         top_k: int = 40,
         min_p: float = 0.0,
         max_new_tokens: int = 512,
-        repetition_penalty: float = 1.1,
+        repetition_penalty: float = 1.0,
         cancel_event = None,
     ) -> Generator[str, None, None]:
         """Shared inner logic for audio input generation (Whisper + ASR)."""
