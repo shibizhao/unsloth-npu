@@ -61,6 +61,10 @@ export function buildTrainingStartPayload(
     train_split: hfDataset ? config.datasetSplit : null,
     eval_split: hfDataset ? config.datasetEvalSplit : null,
     local_datasets: localDatasets,
+    local_eval_datasets:
+      config.datasetSource === "upload" && config.uploadedEvalFile
+        ? [config.uploadedEvalFile]
+        : [],
     format_type: config.datasetFormat,
     custom_format_mapping: customFormatMapping,
     num_epochs: config.epochs,
