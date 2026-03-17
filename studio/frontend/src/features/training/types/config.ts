@@ -79,6 +79,7 @@ export interface TrainingConfigState {
   finetuneAttentionModules: boolean;
   finetuneMLPModules: boolean;
   targetModules: string[];
+  maxPositionEmbeddings: number | null;
 }
 
 export interface TrainingConfigActions {
