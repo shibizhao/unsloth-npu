@@ -356,9 +356,12 @@ export function HubModelPicker({
     return s;
   }, [cachedGguf, cachedModels]);
 
+  const chatOnly = usePlatformStore((s) => s.isChatOnly());
+
   const recommendedIds = useMemo(() => {
     const all = dedupe([...models.map((model) => model.id), value ?? ""])
-      .filter((id) => !downloadedSet.has(id.toLowerCase()));
+      .filter((id) => !downloadedSet.has(id.toLowerCase()))
+      .filter((id) => !chatOnly || isGgufRepo(id));
     // Cap at 4 GGUFs + 4 non-GGUFs so the list stays manageable
     const gguf: string[] = [];
     const hub: string[] = [];
@@ -367,12 +370,10 @@ export function HubModelPicker({
       else if (!isGgufRepo(id) && hub.length < 4) hub.push(id);
     }
     return [...gguf, ...hub];
-  }, [models, value, downloadedSet]);
+  }, [models, value, downloadedSet, chatOnly]);
 
   const showHfSection = debouncedQuery.trim().length > 0;
   const recommendedSet = useMemo(() => new Set(recommendedIds), [recommendedIds]);
-
-  const chatOnly = usePlatformStore((s) => s.isChatOnly());
 
   const hfIds = useMemo(() => {
     if (!showHfSection) return [];
@@ -437,7 +438,7 @@ export function HubModelPicker({
               <Spinner className="size-3 text-muted-foreground" />
               <span className="text-xs text-muted-foreground">Loading models…</span>
             </div>
-          ) : !showHfSection && (cachedGguf.length > 0 || cachedModels.length > 0) ? (
+          ) : !showHfSection && (cachedGguf.length > 0 || (!chatOnly && cachedModels.length > 0)) ? (
             <>
               <ListLabel>{"\uD83E\uDDA5"} Downloaded</ListLabel>
               {cachedGguf.map((c) => (
@@ -454,7 +455,7 @@ export function HubModelPicker({
                   )}
                 </div>
               ))}
-              {cachedModels.map((c) => (
+              {!chatOnly && cachedModels.map((c) => (
                 <ModelRow
                   key={c.repo_id}
                   label={c.repo_id}

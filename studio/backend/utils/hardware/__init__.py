@@ -7,6 +7,7 @@ Hardware detection and GPU utilities
 from .hardware import (
     DeviceType,
     DEVICE,
+    CHAT_ONLY,
     detect_hardware,
     get_device,
     is_apple_silicon,
@@ -17,12 +18,14 @@ from .hardware import (
     get_package_versions,
     get_gpu_utilization,
     get_physical_gpu_count,
+    get_visible_gpu_count,
     safe_num_proc,
 )
 
 __all__ = [
     "DeviceType",
     "DEVICE",
+    "CHAT_ONLY",
     "detect_hardware",
     "get_device",
     "is_apple_silicon",
@@ -33,5 +36,6 @@ __all__ = [
     "get_package_versions",
     "get_gpu_utilization",
     "get_physical_gpu_count",
+    "get_visible_gpu_count",
     "safe_num_proc",
 ]
