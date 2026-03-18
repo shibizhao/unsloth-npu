@@ -463,6 +463,7 @@ class UnslothTrainer:
         is_dataset_image: bool = False,
         is_dataset_audio: bool = False,
         trust_remote_code: bool = False,
+        full_finetuning: bool = False,
     ) -> bool:
         """Load model for training (supports both text and vision models)"""
         self.load_in_4bit = load_in_4bit  # Store for training_meta.json
@@ -609,6 +610,7 @@ class UnslothTrainer:
                     dtype = None,
                     auto_model = CsmForConditionalGeneration,
                     load_in_4bit = False,
+                    full_finetuning = full_finetuning,
                     token = hf_token,
                     trust_remote_code = trust_remote_code,
                 )
@@ -623,6 +625,7 @@ class UnslothTrainer:
                     model_name = model_name,
                     dtype = None,
                     load_in_4bit = False,
+                    full_finetuning = full_finetuning,
                     auto_model = WhisperForConditionalGeneration,
                     whisper_language = "English",
                     whisper_task = "transcribe",
@@ -643,6 +646,7 @@ class UnslothTrainer:
                     max_seq_length = max_seq_length,
                     dtype = None,
                     load_in_4bit = load_in_4bit,
+                    full_finetuning = full_finetuning,
                     token = hf_token,
                     trust_remote_code = trust_remote_code,
                 )
@@ -681,6 +685,7 @@ class UnslothTrainer:
                     max_seq_length = max_seq_length,
                     dtype = torch.float32,  # Spark-TTS requires float32
                     load_in_4bit = False,
+                    full_finetuning = full_finetuning,
                     token = hf_token,
                     trust_remote_code = trust_remote_code,
                 )
@@ -694,6 +699,7 @@ class UnslothTrainer:
                     model_name,
                     max_seq_length = max_seq_length,
                     load_in_4bit = False,
+                    full_finetuning = full_finetuning,
                     token = hf_token,
                     trust_remote_code = trust_remote_code,
                 )
@@ -709,6 +715,7 @@ class UnslothTrainer:
                     max_seq_length = max_seq_length,
                     dtype = None,
                     load_in_4bit = load_in_4bit,
+                    full_finetuning = full_finetuning,
                     token = hf_token,
                     trust_remote_code = trust_remote_code,
                 )
@@ -721,6 +728,7 @@ class UnslothTrainer:
                     max_seq_length = max_seq_length,
                     dtype = None,  # Auto-detect
                     load_in_4bit = load_in_4bit,
+                    full_finetuning = full_finetuning,
                     token = hf_token,
                     trust_remote_code = trust_remote_code,
                 )
@@ -752,6 +760,7 @@ class UnslothTrainer:
                     max_seq_length = max_seq_length,
                     dtype = None,  # Auto-detect
                     load_in_4bit = load_in_4bit,
+                    full_finetuning = full_finetuning,
                     token = hf_token,
                     trust_remote_code = trust_remote_code,
                 )
@@ -776,13 +785,14 @@ class UnslothTrainer:
                 self._source_code_retried = True
                 logger.info(f"\n'could not get source code' — retrying once...\n")
                 return self.load_model(
-                    model_name,
-                    max_seq_length,
-                    load_in_4bit,
-                    hf_token,
-                    is_dataset_image,
-                    is_dataset_audio,
-                    trust_remote_code,
+                    model_name = model_name,
+                    max_seq_length = max_seq_length,
+                    load_in_4bit = load_in_4bit,
+                    hf_token = hf_token,
+                    is_dataset_image = is_dataset_image,
+                    is_dataset_audio = is_dataset_audio,
+                    trust_remote_code = trust_remote_code,
+                    full_finetuning = full_finetuning,
                 )
             error_msg = str(e)
             error_lower = error_msg.lower()
