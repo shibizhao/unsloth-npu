@@ -290,11 +290,11 @@ def apply_chat_template_to_dataset(
             }
 
             if not isinstance(dataset, IterableDataset):
-                from utils.hardware import safe_num_proc
+                from utils.hardware import dataset_map_num_proc
                 if num_proc is None or type(num_proc) is not int:
-                    num_proc = safe_num_proc()
+                    num_proc = dataset_map_num_proc()
                 else:
-                    num_proc = safe_num_proc(num_proc)
+                    num_proc = dataset_map_num_proc(num_proc)
                 dataset_map_kwargs['num_proc'] = num_proc
                 dataset_map_kwargs['desc'] = "Applying template to Alpaca format"
 
@@ -356,11 +356,11 @@ def apply_chat_template_to_dataset(
             }
 
             if not isinstance(dataset, IterableDataset):
-                from utils.hardware import safe_num_proc
+                from utils.hardware import dataset_map_num_proc
                 if num_proc is None or type(num_proc) is not int:
-                    num_proc = safe_num_proc()
+                    num_proc = dataset_map_num_proc()
                 else:
-                    num_proc = safe_num_proc(num_proc)
+                    num_proc = dataset_map_num_proc(num_proc)
                 dataset_map_kwargs['num_proc'] = num_proc
                 dataset_map_kwargs['desc'] = f"Applying chat template to {final_format}"
 
