@@ -78,7 +78,7 @@ export interface LocalModelInfo {
   id: string;
   display_name: string;
   path: string;
-  source: "models_dir" | "hf_cache";
+  source: "models_dir" | "hf_cache" | "lmstudio";
   model_id?: string | null;
   updated_at?: number | null;
 }
@@ -86,6 +86,7 @@ export interface LocalModelInfo {
 interface LocalModelListResponse {
   models_dir: string;
   hf_cache_dir?: string | null;
+  lmstudio_dirs: string[];
   models: LocalModelInfo[];
 }
 
