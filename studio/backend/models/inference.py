@@ -135,6 +135,10 @@ class LoadResponse(BaseModel):
         False,
         description = "Whether model supports thinking/reasoning mode (enable_thinking)",
     )
+    reasoning_always_on: bool = Field(
+        False,
+        description = "Whether reasoning is always on (hardcoded <think> tags, not toggleable)",
+    )
     supports_tools: bool = Field(
         False,
         description = "Whether model supports tool calling (web search, etc.)",
@@ -191,6 +195,9 @@ class InferenceStatusResponse(BaseModel):
     )
     supports_reasoning: bool = Field(
         False, description = "Whether the active model supports reasoning/thinking mode"
+    )
+    reasoning_always_on: bool = Field(
+        False, description = "Whether reasoning is always on (not toggleable)"
     )
     supports_tools: bool = Field(
         False, description = "Whether the active model supports tool calling"
