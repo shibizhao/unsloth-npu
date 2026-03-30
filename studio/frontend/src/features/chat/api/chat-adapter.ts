@@ -297,6 +297,7 @@ async function autoLoadSmallestModel(): Promise<boolean> {
             }
             useChatRuntimeStore.setState({
               ggufContextLength: loadResp.context_length ?? 131072,
+              ggufMaxContextLength: loadResp.max_context_length ?? loadResp.context_length ?? 131072,
               supportsReasoning: loadResp.supports_reasoning ?? false,
               reasoningAlwaysOn: loadResp.reasoning_always_on ?? false,
               reasoningEnabled: loadResp.supports_reasoning ?? false,
@@ -383,6 +384,7 @@ async function autoLoadSmallestModel(): Promise<boolean> {
       }
       useChatRuntimeStore.setState({
         ggufContextLength: loadResp.context_length ?? 131072,
+        ggufMaxContextLength: loadResp.max_context_length ?? loadResp.context_length ?? 131072,
         supportsReasoning: loadResp.supports_reasoning ?? false,
         reasoningAlwaysOn: loadResp.reasoning_always_on ?? false,
         reasoningEnabled: loadResp.supports_reasoning ?? false,
