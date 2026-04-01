@@ -568,6 +568,37 @@ def grpo_trainer__generate_and_score_completions(function_name, function):
 
         function = patched
 
+    # Transformers 5.x: Extend mm_token_type_ids for completion tokens (Qwen3VL M-RoPE).
+    # TRL handles token_type_ids but not mm_token_type_ids.
+    _tt_search = (
+        'if "token_type_ids" in forward_kwargs:\n'
+        '            token_type_ids = forward_kwargs["token_type_ids"]\n'
+        '            forward_kwargs["token_type_ids"] = torch.cat(\n'
+        "                [token_type_ids, token_type_ids.new_zeros(completion_ids.shape)], dim=1\n"
+        "            )"
+    )
+    _tt_replace = (
+        _tt_search + "\n"
+        '        if "mm_token_type_ids" in forward_kwargs:\n'
+        '            mm_tti = forward_kwargs["mm_token_type_ids"]\n'
+        '            forward_kwargs["mm_token_type_ids"] = torch.cat(\n'
+        "                [mm_tti, mm_tti.new_zeros(completion_ids.shape)], dim=1\n"
+        "            )"
+    )
+    function = function.replace(_tt_search, _tt_replace)
+
+    # Save mm_token_type_ids to output dict alongside token_type_ids
+    _save_search = (
+        'if "token_type_ids" in forward_kwargs:\n'
+        '            output["token_type_ids"] = forward_kwargs["token_type_ids"]'
+    )
+    _save_replace = (
+        _save_search + "\n"
+        '        if "mm_token_type_ids" in forward_kwargs:\n'
+        '            output["mm_token_type_ids"] = forward_kwargs["mm_token_type_ids"]'
+    )
+    function = function.replace(_save_search, _save_replace)
+
     return function
 
 
@@ -740,6 +771,9 @@ def grpo_trainer__get_per_token_logps_and_entropies(function_name, function):
                 kwargs.get("pixel_attention_mask", None),
                 kwargs.get("image_sizes", None),
             )
+            # Transformers 5.x needs token_type_ids/mm_token_type_ids for some vision models
+            token_type_ids = kwargs.get("token_type_ids", None)
+            mm_token_type_ids = kwargs.get("mm_token_type_ids", None)
 
             unwrapped_model = self.accelerator.unwrap_model(
                 model, keep_fp32_wrapper = False
@@ -857,6 +891,10 @@ def grpo_trainer__get_per_token_logps_and_entropies(function_name, function):
             if logit_scale_divide is None:
                 logit_scale_divide = 0
 
+            # Transformers 5.x needs token_type_ids/mm_token_type_ids for some vision models
+            token_type_ids_chunks = chunk_optional(token_type_ids, B)
+            mm_token_type_ids_chunks = chunk_optional(mm_token_type_ids, B)
+
             zipped_inputs = zip(
                 input_ids_chunks,
                 attention_mask_chunks,
@@ -864,6 +902,8 @@ def grpo_trainer__get_per_token_logps_and_entropies(function_name, function):
                 image_grid_thw_chunks,
                 pixel_attention_mask_chunks,
                 image_sizes_chunks,
+                token_type_ids_chunks,
+                mm_token_type_ids_chunks,
             )
             os.environ["UNSLOTH_RETURN_HIDDEN_STATES"] = "1"
 
@@ -875,27 +915,19 @@ def grpo_trainer__get_per_token_logps_and_entropies(function_name, function):
                     image_grid_thw_chunk,
                     pixel_attention_mask_chunk,
                     image_sizes_chunk,
+                    token_type_ids_chunk,
+                    mm_token_type_ids_chunk,
                 ) in zipped_inputs:
-
-                    # Unsloth-PTO-VERIFY: check the native autocast_ctx on cuda
-                    # Native Implementations of autocast_ctx on cuda
-                    # with torch.amp.autocast(
-                    #     device_type = "cuda", dtype = self._autocast_dtype
-                    # ):
-                    # with _autocast_ctx:
-
-                    # Unsloth-PTO-VERIFY: check the implementations of NPU
-                    # Use correct device type for autocast (NPU, CUDA, etc.)
-                    # Detect device type at runtime since this function is injected into compiled trainer
-                    _device_type = self.model.device.type if hasattr(self.model, 'device') else 'cuda'
-                    if _device_type == "npu" or (hasattr(torch, 'npu') and torch.npu.is_available()):
-                        # NPU uses npu-specific autocast context
-                        _autocast_ctx = torch.npu.amp.autocast(enabled=True, dtype=self._autocast_dtype)
-                    else:
-                        _autocast_ctx = torch.amp.autocast(
-                            device_type = _device_type, dtype = self._autocast_dtype
+                    _extra_vision_kwargs = {}
+                    if token_type_ids_chunk is not None:
+                        _extra_vision_kwargs["token_type_ids"] = token_type_ids_chunk
+                    if mm_token_type_ids_chunk is not None:
+                        _extra_vision_kwargs["mm_token_type_ids"] = (
+                            mm_token_type_ids_chunk
                         )
-                    with _autocast_ctx:
+                    with torch.amp.autocast(
+                        device_type = "cuda", dtype = self._autocast_dtype
+                    ):
                         if pixel_values is None:
                             logits_chunk = unwrapped_model(
                                 input_ids = input_ids_chunk,
@@ -904,6 +936,7 @@ def grpo_trainer__get_per_token_logps_and_entropies(function_name, function):
                                 image_grid_thw = image_grid_thw_chunk,
                                 pixel_attention_mask = pixel_attention_mask_chunk,
                                 image_sizes = image_sizes_chunk,
+                                **_extra_vision_kwargs,
                             ).logits
 
                             completion_input_ids_chunk = input_ids_chunk[
@@ -936,6 +969,7 @@ def grpo_trainer__get_per_token_logps_and_entropies(function_name, function):
                                 pixel_attention_mask = pixel_attention_mask_chunk,
                                 image_sizes = image_sizes_chunk,
                                 logits_to_keep = logits_to_keep + 1,
+                                **_extra_vision_kwargs,
                             ).logits
 
                             logits_chunk = logits_chunk[:, :-1, :]
@@ -1036,6 +1070,9 @@ def grpo_trainer_compute_loss(function_name, function):
             inputs.get("pixel_attention_mask", None),
             inputs.get("image_sizes", None),
         )
+        # Transformers 5.x needs token_type_ids/mm_token_type_ids for some vision models
+        token_type_ids = inputs.get("token_type_ids", None)
+        mm_token_type_ids = inputs.get("mm_token_type_ids", None)
         num_items_in_batch = inputs.get("num_items_in_batch", None)
         sampling_per_token_logps = inputs.get("sampling_per_token_logps", None)
         current_gradient_accumulation_steps = self.current_gradient_accumulation_steps
@@ -1179,6 +1216,8 @@ def grpo_trainer_compute_loss(function_name, function):
                     current_gradient_accumulation_steps = current_gradient_accumulation_steps,
                     num_processes = num_processes,
                     sampling_per_token_logps = sampling_per_token_logps,
+                    token_type_ids = token_type_ids,
+                    mm_token_type_ids = mm_token_type_ids,
                 )
             else:
                 # to ensure backwards compatibility with trl 0.15.2 and maybe even 0.17
@@ -1197,6 +1236,8 @@ def grpo_trainer_compute_loss(function_name, function):
                         logit_scale_multiply = logit_scale_multiply,
                         logit_scale_divide = logit_scale_divide,
                         attention_mask = attention_mask,
+                        token_type_ids = token_type_ids,
+                        mm_token_type_ids = mm_token_type_ids,
                     )
                 )
         if "train" in self._metrics:
