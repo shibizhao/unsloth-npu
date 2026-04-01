@@ -120,17 +120,17 @@ function ModelRow({
       <span
         className={cn(
           "block min-w-0 flex-1 truncate",
-          exceeds && "line-through decoration-muted-foreground/50",
+          exceeds && "!text-gray-500 dark:!text-gray-400",
         )}
       >
         {label}
       </span>
       <span className="ml-auto flex items-center gap-1.5 shrink-0">
         {vramStatus === "exceeds" && (
-          <span className="text-[9px] font-medium text-red-400">OOM</span>
+          <span className="text-[9px] font-medium !text-red-700 !bg-red-50 dark:!text-red-400 dark:!bg-red-950 px-1.5 py-0.5 rounded">OOM</span>
         )}
         {vramStatus === "tight" && (
-          <span className="text-[9px] font-medium text-amber-400">TIGHT</span>
+          <span className="text-[9px] font-medium !text-amber-400">TIGHT</span>
         )}
         {meta ? (
           <span className="text-[10px] text-muted-foreground">{meta}</span>
@@ -341,7 +341,7 @@ function GgufVariantExpander({
               )}
             >
               <span className="min-w-0 flex-1 truncate font-mono text-xs">
-                {v.quant}
+                <span className={cn(oom && "!text-gray-500 dark:!text-gray-400")}>{v.quant}</span>
                 {v.downloaded ? (
                   <span className="ml-1.5 text-[9px] font-sans font-medium text-green-400">
                     downloaded
@@ -354,12 +354,12 @@ function GgufVariantExpander({
               </span>
               <span className="flex items-center gap-1.5 shrink-0">
                 {oom && (
-                  <span className="text-[9px] font-medium text-red-400">
+                  <span className="text-[9px] font-medium !text-red-700 !bg-red-50 dark:!text-red-400 dark:!bg-red-950 px-1.5 py-0.5 rounded">
                     OOM
                   </span>
                 )}
                 {tight && (
-                  <span className="text-[9px] font-medium text-amber-400">
+                  <span className="text-[9px] font-medium !text-amber-400">
                     TIGHT
                   </span>
                 )}
