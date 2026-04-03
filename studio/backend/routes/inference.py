@@ -178,6 +178,7 @@ async def load_model(
                     supports_reasoning = llama_backend.supports_reasoning,
                     reasoning_always_on = llama_backend.reasoning_always_on,
                     chat_template = llama_backend.chat_template,
+                    speculative_type = llama_backend.speculative_type,
                 )
         else:
             if (
@@ -262,6 +263,7 @@ async def load_model(
                     n_ctx = request.max_seq_length,
                     chat_template_override = request.chat_template_override,
                     cache_type_kv = request.cache_type_kv,
+                    speculative_type = request.speculative_type,
                 )
             else:
                 # Local mode: llama-server loads via -m <path>
@@ -274,6 +276,7 @@ async def load_model(
                     n_ctx = request.max_seq_length,
                     chat_template_override = request.chat_template_override,
                     cache_type_kv = request.cache_type_kv,
+                    speculative_type = request.speculative_type,
                 )
 
             if not success:
@@ -316,6 +319,7 @@ async def load_model(
                 supports_tools = llama_backend.supports_tools,
                 cache_type_kv = llama_backend.cache_type_kv,
                 chat_template = llama_backend.chat_template,
+                speculative_type = llama_backend.speculative_type,
             )
 
         # ── Standard path: load via Unsloth/transformers ──────────
@@ -651,6 +655,7 @@ async def get_status(
                 context_length = llama_backend.context_length,
                 max_context_length = llama_backend.max_context_length,
                 native_context_length = llama_backend.native_context_length,
+                speculative_type = llama_backend.speculative_type,
             )
 
         # Otherwise, report Unsloth backend status
