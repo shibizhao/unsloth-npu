@@ -579,7 +579,7 @@ def fast_rms_layernorm_inference_gemma(self, X, out_weight = None):
 # Normal layernorm with mean removal
 # Unsloth-PTO-FIXME: Fix the torch.compile support for NPU
 # Currently, we commmented the torch.compile deracotor for the funning.
-# @torch.compile(fullgraph = False, dynamic = True, options = torch_compile_options)
+@torch.compile(fullgraph = False, dynamic = True, options = torch_compile_options)
 def fast_layernorm_compiled(layernorm, X):
     old_dtype = X.dtype
     X = X.float()
