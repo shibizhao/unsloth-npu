@@ -43,6 +43,8 @@ if DEVICE_TYPE == "xpu" and Version(torch.__version__) < Version("2.6.0"):
         "Intel xpu currently supports unsloth with torch.version >= 2.6.0"
     )
 
+# Unsloth-NPU-TODO: check the torch version
+
 if Version(torch.__version__) < Version("2.4.0"):
     torch_amp_custom_fwd = torch.cuda.amp.custom_fwd
     torch_amp_custom_bwd = torch.cuda.amp.custom_bwd
@@ -54,7 +56,12 @@ if DEVICE_TYPE == "xpu":
     torch_amp_custom_fwd = torch.amp.custom_fwd(device_type = "xpu")
     torch_amp_custom_bwd = torch.amp.custom_bwd(device_type = "xpu")
 
+# Unsloth-NPU-FIXME:
+if DEVICE_TYPE == "npu":
+    torch_amp_custom_fwd = torch.npu.amp.custom_fwd
+    torch_amp_custom_bwd = torch.npu.amp.custom_bwd
 
+# Unsloth-NPU-TODO: check the compatibility of triton for npu
 # tl.math.tanh now is libdevice.tanh
 import triton
 import triton.language as tl
@@ -129,11 +136,18 @@ get_ptr = bnb.functional.get_ptr
 if DEVICE_TYPE == "xpu":
     HAS_XPU_STREAM = True
 
+# Unsloth-NPU-FIXME:
+if DEVICE_TYPE == "npu":
+    HAS_NPU_STREAM = True
+
 if DEVICE_COUNT > 1:
     if DEVICE_TYPE in ("cuda", "hip"):
         torch_gpu_device = torch.cuda.device
     elif DEVICE_TYPE == "xpu":
         torch_gpu_device = torch.xpu.device
+    # Unsloth-NPU-FIXME:
+    elif DEVICE_TYPE == "npu":
+        torch_gpu_device = torch.npu.device
 else:
     from contextlib import nullcontext
 
@@ -144,6 +158,9 @@ else:
 # INTEL GPU Specific Logic
 if DEVICE_TYPE == "xpu":
     _gpu_getCurrentRawStream = torch._C._xpu_getCurrentRawStream
+# Unsloth-NPU-FIXME: ASCEND NPU Specific Logic
+elif DEVICE_TYPE == "npu":
+    _gpu_getCurrentRawStream = torch._C._npu_getCurrentRawStream
 # NVIDIA GPU Default Logic
 else:
     _gpu_getCurrentRawStream = torch._C._cuda_getCurrentRawStream
@@ -176,6 +193,22 @@ if DEVICE_TYPE == "xpu":
         XPU_STREAMS[k] = v
     XPU_STREAMS = tuple(XPU_STREAMS)
     del _XPU_STREAMS
+
+# Unsloth-NPU-FIXME: ASCEND NPU Specific Logic
+elif DEVICE_TYPE == "npu":
+    _NPU_STREAMS = {
+        (index := torch.npu.device(i).idx): ctypes.c_void_p(
+            torch._C._npu_getCurrentRawStream(index)
+        )
+        for i in range(DEVICE_COUNT)
+    }
+    NPU_STREAMS = [None] * (max(_NPU_STREAMS.keys()) + 1)
+    WEIGHT_BUFFERS = [None] * (max(_NPU_STREAMS.keys()) + 1)
+    ABSMAX_BUFFERS = [None] * (max(_NPU_STREAMS.keys()) + 1)
+    for k, v in _NPU_STREAMS.items():
+        NPU_STREAMS[k] = v
+    NPU_STREAMS = tuple(NPU_STREAMS)
+    del _NPU_STREAMS
 else:
     # NVIDIA GPU Default Logic
     _CUDA_STREAMS = {
@@ -204,14 +237,18 @@ if DEVICE_TYPE == "xpu":
     # for xpu, inference gemv using above link
     cgemm_4bit_inference_naive_fp16 = bnb.functional.lib.cgemv_4bit_inference_fp16
     cgemm_4bit_inference_naive_bf16 = bnb.functional.lib.cgemv_4bit_inference_bf16
+# Unsloth-NPU-TODO: check the cgemm_4bit_inference_naive_fp16 and cgemm_4bit_inference_naive_bf16 for npu
 else:
     cgemm_4bit_inference_naive_fp16 = bnb.functional.lib.cgemm_4bit_inference_naive_fp16
     cgemm_4bit_inference_naive_bf16 = bnb.functional.lib.cgemm_4bit_inference_naive_bf16
 
-
-torch_device_stream = (
-    torch.xpu.current_stream if DEVICE_TYPE == "xpu" else torch.cuda.current_stream
-)
+# Unsloth-NPU-FIXME:
+if DEVICE_TYPE == "npu":
+    torch_device_stream = torch.npu.current_stream
+else:
+    torch_device_stream = (
+        torch.xpu.current_stream if DEVICE_TYPE == "xpu" else torch.cuda.current_stream
+    )
 
 torch_mm = torch.mm
 torch_mv = torch.mv
@@ -465,6 +502,8 @@ if DEVICE_TYPE == "xpu" and HAS_XPU_STREAM:
         # Careful returning transposed data
         is_transposed = True if W.shape[0] == 1 else False
         return out.t() if is_transposed else out
+
+# Unsloth-NPU-TODO: add the fast dequantize kernels for Ascend NPU
 
 # NVIDIA GPU Default Logic
 elif DEVICE_TYPE in ("cuda", "hip") and HAS_CUDA_STREAM:
@@ -760,6 +799,8 @@ if DEVICE_TYPE == "xpu" and HAS_XPU_STREAM:
             )
 
         return out
+
+# Unsloth-NPU-TODO: add the fast gemv kernels for Ascend NPU
 
 elif DEVICE_TYPE in ("cuda", "hip") and HAS_CUDA_STREAM:
 

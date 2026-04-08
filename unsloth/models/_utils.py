@@ -874,6 +874,11 @@ elif DEVICE_TYPE == "xpu":
     else:
         torch_amp_custom_fwd = torch.amp.custom_fwd(device_type = "xpu")
         torch_amp_custom_bwd = torch.amp.custom_bwd(device_type = "xpu")
+
+# Unsloth-NPU-FIXME: check the torch.amp.custom_fwd and torch.amp.custom_bwd for npu
+elif DEVICE_TYPE == "npu":
+    torch_amp_custom_fwd = torch.npu.amp.custom_fwd
+    torch_amp_custom_bwd = torch.npu.amp.custom_bwd
 # =============================================
 
 # =============================================
@@ -1022,7 +1027,9 @@ elif DEVICE_TYPE == "hip":
             HAS_FLASH_ATTENTION = False
 elif DEVICE_TYPE == "xpu":
     SUPPORTS_BFLOAT16 = True
-
+# Unsloth-NPU-FIXME: check the bf16 suuport on Ascend NPU
+elif DEVICE_TYPE == "npu":
+    SUPPORTS_BFLOAT16 = True
 # =============================================
 # Get Xformers
 # Silence xformers CUDA mismatch warnings before import
@@ -1193,6 +1200,12 @@ def is_big_gpu(index) -> bool:
     if DEVICE_TYPE == "xpu":
         prop = DeviceProperties.create(
             torch.device("xpu", index) if type(index) is int else index
+        )
+        min_sms = 16
+    # Unsloth-NPU-FIXME: check the min_sms for npu
+    elif DEVICE_TYPE == "npu":
+        prop = DeviceProperties.create(
+            torch.device("npu", index) if type(index) is int else index
         )
         min_sms = 16
     else:
@@ -1499,11 +1512,19 @@ def get_statistics(local_files_only = False):
         disabled = True
     _get_statistics(None)
     _get_statistics("repeat", force_download = False)
-    total_memory = (
-        torch.xpu.get_device_properties(0).total_memory
-        if DEVICE_TYPE == "xpu"
-        else torch.cuda.get_device_properties(0).total_memory
-    )
+    # Unsloth-NPU-FIXME: add "npu" to the list
+    # total_memory = (
+    #     torch.xpu.get_device_properties(0).total_memory
+    #     if DEVICE_TYPE == "xpu"
+    #     else torch.cuda.get_device_properties(0).total_memory
+    # )
+    if DEVICE_TYPE == "xpu":
+        total_memory = torch.xpu.get_device_properties(0).total_memory
+    elif DEVICE_TYPE == "npu":
+        total_memory = torch.npu.get_device_properties(0).total_memory
+    else:
+        total_memory = torch.cuda.get_device_properties(0).total_memory
+
     vram = total_memory / 1024 / 1024 / 1024
     if vram <= 8:
         vram = 8
@@ -2693,7 +2714,7 @@ def verify_fp8_support_if_applicable(model_config):
             raise ValueError(
                 f"Unsloth: FP8 quantization is only supported on L4 and higher GPUs with compute capability 8.9 or higher. You are using {torch.cuda.get_device_name()}. Refer to https://developer.nvidia.com/cuda-gpus for more details."
             )
-
+    # Unsloth-NPU-FIXME: Need to add FP8 support for Ascend NPU (950 and higher)
 
 def _get_inference_mode_context_manager(model: torch.nn.Module):
     """

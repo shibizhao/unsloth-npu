@@ -512,6 +512,16 @@ class FastBaseModel:
             gpu_stats_snippet = f"Intel Toolkit: {gpu_version}."
             # [TODO] After adding vLLM support for XPU, change this
             vllm_version = ""
+        # Unsloth-NPU-FIXME:
+        elif DEVICE_TYPE == "npu":
+            gpu_stats = torch.npu.get_device_properties(0)
+            gpu_stats_name = (
+                gpu_stats.name + ". " if gpu_stats.name != "" else "Ascend NPU Device. "
+            )
+            gpu_version = torch.version.npu
+            gpu_stats_snippet = f"Ascend Toolkit: {gpu_version}."
+            # Unsloth-NPU-TODO: check the vllm version for npu
+            vllm_version = ""
         else:
             raise ValueError(f"Unsloth: Unsupported device type: {DEVICE_TYPE}")
 
@@ -949,6 +959,9 @@ class FastBaseModel:
                 torch.cuda.empty_cache()
             elif DEVICE_TYPE == "xpu":
                 torch.xpu.empty_cache()
+            # Unsloth-NPU-FIXME:
+            elif DEVICE_TYPE == "npu":
+                torch.npu.empty_cache()
 
         # Counteract saved tokenizers
         tokenizer_name = model_name if tokenizer_name is None else tokenizer_name
@@ -1172,6 +1185,9 @@ class FastBaseModel:
                 torch.cuda.empty_cache()
             elif DEVICE_TYPE == "xpu":
                 torch.xpu.empty_cache()
+            # Unsloth-NPU-FIXME:
+            elif DEVICE_TYPE == "npu":
+                torch.npu.empty_cache()
         return model, tokenizer
 
     @staticmethod
@@ -1274,6 +1290,9 @@ class FastBaseModel:
                 torch.cuda.empty_cache()
             elif DEVICE_TYPE == "xpu":
                 torch.xpu.empty_cache()
+            # Unsloth-NPU-FIXME:
+            elif DEVICE_TYPE == "npu":
+                torch.npu.empty_cache()
         max_seq_length = model.max_seq_length
         # If we pass loftq_config = None we will get an error
         loftq_config = validate_loftq_config(
@@ -1376,6 +1395,9 @@ class FastBaseModel:
                 torch.cuda.empty_cache()
             elif DEVICE_TYPE == "xpu":
                 torch.xpu.empty_cache()
+            # Unsloth-NPU-FIXME:
+            elif DEVICE_TYPE == "npu":
+                torch.npu.empty_cache()
         patch_saving_functions(model, vision = True)
         patch_peft_fast_inference(model)
 
@@ -1490,6 +1512,9 @@ class FastBaseModel:
                 torch.cuda.empty_cache()
             elif DEVICE_TYPE == "xpu":
                 torch.xpu.empty_cache()
+            # Unsloth-NPU-FIXME:
+            elif DEVICE_TYPE == "npu":
+                torch.npu.empty_cache()
         # Add for_inference and for_training
         model.for_training = functools.partial(FastBaseModel.for_training, model)
         model.for_inference = functools.partial(FastBaseModel.for_inference, model)

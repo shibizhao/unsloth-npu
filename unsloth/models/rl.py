@@ -1409,7 +1409,8 @@ def _patch_trl_rl_trainers(trainer_file = "grpo_trainer"):
         }"""
             new_options = base_options + cuda_options
         else:
-            # XPU, HIP, and other device types use base options only
+            # Unsloth-NPU-TODO: check the compile options for npu
+            # XPU, HIP, NPU, and other device types use base options only
             new_options = (
                 base_options
                 + """

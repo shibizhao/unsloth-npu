@@ -1101,3 +1101,5 @@ class TestXpuRejection(_GpuCacheResetMixin, unittest.TestCase):
         with patch("utils.hardware.hardware.get_device", return_value = DeviceType.XPU):
             with self.assertRaisesRegex(ValueError, "only supported on CUDA"):
                 prepare_gpu_selection([0], model_name = "unsloth/test")
+
+# Unsloth-NPU-TODO: add a TestNpuRejection?

@@ -38,6 +38,9 @@ class DeviceType(str, Enum):
     MLX = "mlx"
     CPU = "cpu"
 
+    # Unsloth-NPU-FIXME:
+    NPU = "npu"
+
 
 # ========== Global State (set once by detect_hardware) ==========
 
@@ -117,6 +120,19 @@ def detect_hardware() -> DeviceType:
         print(f"Hardware detected: MLX — Apple Silicon ({chip})")
         return DEVICE
 
+    # Unsloth-NPU-FIXME:
+    # --- NPU: Ascend NPU ---
+    if _has_torch():
+        import torch
+
+        if hasattr(torch, "npu") and torch.npu.is_available():
+            DEVICE = DeviceType.NPU
+            CHAT_ONLY = False
+            device_name = torch.npu.get_device_name(0)
+            print(f"Hardware detected: NPU — {device_name}")
+            return DEVICE
+
+
     # --- Fallback ---
     DEVICE = DeviceType.CPU
     print("Hardware detected: CPU (no GPU backend available)")
@@ -159,6 +175,12 @@ def clear_gpu_cache():
 
         torch.xpu.synchronize()
         torch.xpu.empty_cache()
+    # Unsloth-NPU-FIXME: check the ipc_collect() for npu?
+    elif device == DeviceType.NPU:
+        import torch
+
+        torch.npu.synchronize()
+        torch.npu.empty_cache()
     elif device == DeviceType.MLX:
         # MLX manages memory automatically; no explicit cache clear needed.
         # mlx.core has no empty_cache equivalent — gc.collect() above is enough.
@@ -252,6 +274,33 @@ def get_gpu_memory_info() -> Dict[str, Any]:
             logger.error(f"Error getting MLX GPU info: {e}")
             return {"available": False, "backend": device.value, "error": str(e)}
 
+    # Unsloth-NPU-FIXME:
+    if device == DeviceType.NPU:
+        try:
+            import torch
+
+            idx = torch.npu.current_device()
+            props = torch.npu.get_device_properties(idx)
+
+            total = props.total_memory
+            allocated = torch.npu.memory_allocated(idx)
+            reserved = torch.npu.memory_reserved(idx)
+
+            return {
+                "available": True,
+                "backend": device.value,
+                "device": idx,
+                "device_name": props.name,
+                "total_gb": total / (1024**3),
+                "allocated_gb": allocated / (1024**3),
+                "reserved_gb": reserved / (1024**3),
+                "free_gb": (total - allocated) / (1024**3),
+                "utilization_pct": (allocated / total) * 100,
+            }   
+        except Exception as e:
+            logger.error("Error getting NPU GPU info: %s", e)
+            return {"available": False, "backend": device.value, "error": str(e)}
+
     # ---- CPU-only ----
     return {"available": False, "backend": "cpu"}
 
@@ -338,6 +387,9 @@ def _torch_get_device_module():
         return torch.cuda, "cuda"
     if device == DeviceType.XPU and hasattr(torch, "xpu"):
         return torch.xpu, "xpu"
+    # Unsloth-NPU-FIXME:
+    if device == DeviceType.NPU and hasattr(torch, "npu"):
+        return torch.npu, "npu"
     return None, None
 
 
@@ -482,6 +534,39 @@ def get_visible_gpu_utilization() -> Dict[str, Any]:
             }
 
     if device == DeviceType.MLX:
+        mem = get_gpu_memory_info()
+        if not mem.get("available"):
+            return {
+                "available": False,
+                "backend": device.value,
+                "parent_visible_gpu_ids": [],
+                "devices": [],
+                "index_kind": "relative",
+            }
+        return {
+            "available": True,
+            "backend": device.value,
+            "parent_visible_gpu_ids": [0],
+            "devices": [
+                {
+                    "index": 0,
+                    "index_kind": "relative",
+                    "visible_ordinal": 0,
+                    "gpu_utilization_pct": None,
+                    "temperature_c": None,
+                    "vram_used_gb": round(mem.get("allocated_gb", 0), 2),
+                    "vram_total_gb": round(mem.get("total_gb", 0), 2),
+                    "vram_utilization_pct": round(mem.get("utilization_pct", 0), 1),
+                    "power_draw_w": None,
+                    "power_limit_w": None,
+                    "power_utilization_pct": None,
+                }
+            ],
+            "index_kind": "relative",
+        }
+    
+    # Unsloth-NPU-TODO: add the support for Ascend NPU, maybe an ascend.py
+    if device == DeviceType.NPU:
         mem = get_gpu_memory_info()
         if not mem.get("available"):
             return {
@@ -1262,6 +1347,9 @@ def get_visible_gpu_count() -> int:
 
         if get_device() == DeviceType.XPU and hasattr(torch, "xpu"):
             _visible_gpu_count = torch.xpu.device_count()
+        # Unsloth-NPU-FIXME:
+        if get_device() == DeviceType.NPU and hasattr(torch, "npu"):
+            _visible_gpu_count = torch.npu.device_count()
         else:
             _visible_gpu_count = torch.cuda.device_count()
     except Exception:

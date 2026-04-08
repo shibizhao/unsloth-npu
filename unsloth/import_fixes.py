@@ -644,11 +644,12 @@ def patch_enable_input_require_grads():
 
 
 def _is_custom_torch_build(raw_version_str):
+    # Unsloth-NPU-FIXME: add "npu" to the string
     """Check if a raw version string indicates a custom or source build.
     Must operate on the raw string from importlib_version(), not the parsed
     Version object, since our custom Version() strips local identifiers.
 
-    Standard PyTorch releases use: +cu124, +rocm6.3, +cpu, +xpu
+    Standard PyTorch releases use: +cu124, +rocm6.3, +cpu, +xpu, +npu
     Source/custom builds use: +gitXXXXXXX, +HEXHASH, or other suffixes.
     """
     if "+" not in raw_version_str:
@@ -656,10 +657,11 @@ def _is_custom_torch_build(raw_version_str):
     local = raw_version_str.split("+", 1)[1]
     if not local:
         return False
+    # Unsloth-NPU-FIXME: add "npu" to the regex
     # Use fullmatch so the entire local identifier must match, not just a prefix.
-    # cu/rocm require a trailing digit (e.g. cu124, rocm6.3). cpu/xpu are exact.
+    # cu/rocm require a trailing digit (e.g. cu124, rocm6.3). cpu/xpu/npu are exact.
     # Case-insensitive since some builds may use uppercase.
-    return not re.fullmatch(r"cu\d[\d.]*|rocm\d[\d.]*|cpu|xpu", local, re.IGNORECASE)
+    return not re.fullmatch(r"cu\d[\d.]*|rocm\d[\d.]*|cpu|xpu|npu", local, re.IGNORECASE)
 
 
 def _infer_required_torchvision(torch_major, torch_minor):

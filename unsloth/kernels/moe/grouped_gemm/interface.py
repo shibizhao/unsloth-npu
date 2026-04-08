@@ -42,7 +42,8 @@ logger.addHandler(ch)
 # 1. NVIDIA GPU with capability >= 9 (Hopper+)
 # 2. Triton version with TMA API (make_tensor_descriptor or _experimental_make_tensor_descriptor)
 def _check_tma_support():
-    if DEVICE_TYPE in ("xpu", "hip"):
+    # Unsloth-NPU-FIXME: add "npu" to the list
+    if DEVICE_TYPE in ("xpu", "hip", "npu"):
         return False
     import triton.language as tl
 

@@ -126,6 +126,10 @@ BlockDiagonalCausalMask = (
 if DEVICE_TYPE == "xpu":
     clean_gpu_cache = torch.xpu.empty_cache
     get_current_device = torch.xpu.current_device
+# Unsloth-NPU-FIXME:
+elif DEVICE_TYPE == "npu":
+    clean_gpu_cache = torch.npu.empty_cache
+    get_current_device = torch.npu.current_device
 else:
     clean_gpu_cache = torch.cuda.empty_cache
     get_current_device = torch.cuda.current_device
@@ -2280,6 +2284,18 @@ class FastLlamaModel:
                 vllm_version = f" vLLM: {importlib_version('vllm')}."
             except:
                 vllm_version = ""
+        # Unsloth-NPU-FIXME:
+        elif DEVICE_TYPE == "npu":
+            gpu_stats = torch.npu.get_device_properties(0)
+            gpu_stats_name = (
+                gpu_stats.name + ". " if gpu_stats.name != "" else "Ascend NPU Device. "
+            )
+            gpu_version = torch.version.npu
+            gpu_stats_snippet = f"Ascend Toolkit: {gpu_version}."
+            try:
+                vllm_version = f" vLLM: {importlib_version('vllm')}."
+            except:
+                vllm_version = ""
         else:
             raise ValueError(f"Unsloth: Unsupported device type: {DEVICE_TYPE}")
 
@@ -2579,6 +2595,9 @@ class FastLlamaModel:
             gc.collect()
             if DEVICE_TYPE == "xpu":
                 torch.xpu.empty_cache()
+            # Unsloth-NPU-FIXME:
+            elif DEVICE_TYPE == "npu":
+                torch.npu.empty_cache()
             else:
                 torch.cuda.empty_cache()"""
 
