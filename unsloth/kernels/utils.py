@@ -160,7 +160,8 @@ if DEVICE_TYPE == "xpu":
     _gpu_getCurrentRawStream = torch._C._xpu_getCurrentRawStream
 # Unsloth-NPU-FIXME: ASCEND NPU Specific Logic
 elif DEVICE_TYPE == "npu":
-    _gpu_getCurrentRawStream = torch._C._npu_getCurrentRawStream
+    import torch_npu
+    _gpu_getCurrentRawStream = torch_npu._C._npu_getCurrentRawStream
 # NVIDIA GPU Default Logic
 else:
     _gpu_getCurrentRawStream = torch._C._cuda_getCurrentRawStream
@@ -196,9 +197,10 @@ if DEVICE_TYPE == "xpu":
 
 # Unsloth-NPU-FIXME: ASCEND NPU Specific Logic
 elif DEVICE_TYPE == "npu":
+    import torch_npu
     _NPU_STREAMS = {
         (index := torch.npu.device(i).idx): ctypes.c_void_p(
-            torch._C._npu_getCurrentRawStream(index)
+            torch_npu._C._npu_getCurrentRawStream(index)
         )
         for i in range(DEVICE_COUNT)
     }

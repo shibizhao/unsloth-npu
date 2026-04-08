@@ -518,7 +518,7 @@ class FastBaseModel:
             gpu_stats_name = (
                 gpu_stats.name + ". " if gpu_stats.name != "" else "Ascend NPU Device. "
             )
-            gpu_version = torch.version.npu
+            gpu_version = torch.version.cann
             gpu_stats_snippet = f"Ascend Toolkit: {gpu_version}."
             # Unsloth-NPU-TODO: check the vllm version for npu
             vllm_version = ""
